@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ModMetaData>
+    <name>Graphics Setter</name>
+	<supportedVersions>
+		<li>1.0</li>
+	</supportedVersions>
+    <author>Telefonmast</author>
+    <description>
+Ever wonder where RimWorld hid it's graphics settings?
+Apparently there are none, so here you go, have some.
+
+Note that it only affects modded textures!
+	</description>
+</ModMetaData>
