@@ -34,6 +34,10 @@ namespace GraphicSetter
                     byte[] data = File.ReadAllBytes(filePath);
                     texture2D = new Texture2D(2, 2, TextureFormat.Alpha8, settings.useMipMap);
                     texture2D.LoadImage(data);
+                    if (settings.compressImages)
+                    {
+                        texture2D.Compress(true);
+                    }
                     texture2D.name = Path.GetFileNameWithoutExtension(filePath);
                     texture2D.filterMode = settings.filterMode;
                     texture2D.anisoLevel = settings.anisoLevel;
@@ -67,6 +71,7 @@ namespace GraphicSetter
         public int anisoLevel = 2;
         public FilterMode filterMode = FilterMode.Bilinear;
         public bool useMipMap = true;
+        public bool compressImages = true;
         public float mipMapBias = 0f;
         public readonly FloatRange anisoRange = new FloatRange(1, 9);
         public readonly FloatRange MipMapBiasRange = new FloatRange(-0.6f, 1f);
@@ -74,6 +79,7 @@ namespace GraphicSetter
         public void DoSettingsWindowContents(Rect inRect)
         {
             float curY = 50f;
+            CheckBox("Compress Textures", ref curY, ref compressImages);
             CheckBox("(Recommended) Activate Mip-Mapping", ref curY, ref useMipMap);
             Text.Anchor = TextAnchor.UpperCenter;
             if (useMipMap)
@@ -85,21 +91,47 @@ namespace GraphicSetter
             curY += 10f;
             SetFilter(curY);
 
-            float x1 = (inRect.width - 120) / 2f;
-            if (Widgets.ButtonText(new Rect(x1, inRect.yMax-40, 120, 30), "Reset Defaults"))
+            float x1 = (inRect.width - 120)/2;
+            Text.Anchor = TextAnchor.UpperCenter;
+            Rect presetLabel = new Rect(x1, 50, 120, 25);
+            Widgets.Label(presetLabel, "- PRESETS -");
+            Text.Anchor = 0;
+            Rect vanilla = new Rect(x1,presetLabel.yMax,120,35);
+            Rect better = new Rect(x1, vanilla.yMax + 5, 120, 35);
+            Rect ultra = new Rect(x1, better.yMax + 5, 120, 35);
+            if (Widgets.ButtonText(vanilla, "Vanilla"))
             {
                 anisoLevel = 2;
                 filterMode = FilterMode.Bilinear;
+                compressImages = true;
                 useMipMap = true;
                 mipMapBias = 0;
             }
+            if (Widgets.ButtonText(better, "Better"))
+            {
+                anisoLevel = 2;
+                filterMode = FilterMode.Trilinear;
+                compressImages = false;
+                useMipMap = true;
+                mipMapBias = 0;
+            }
+
+            if (Widgets.ButtonText(ultra, "Redefined"))
+            {
+                anisoLevel = 9;
+                filterMode = FilterMode.Trilinear;
+                compressImages = false;
+                useMipMap = true;
+                mipMapBias = -0.6f;
+            }
+
 
             GUI.color = Color.red;
             Text.Font = GameFont.Medium;
             string text = "Game needs to be restarted for changes to take effect!";
             Vector2 size = Text.CalcSize(text);
             float x2 = (inRect.width - size.x) / 2f;
-            Widgets.Label(new Rect(x2, inRect.yMax - 70, size.x, size.y), text);
+            Widgets.Label(new Rect(x2, inRect.yMax - 30, size.x, size.y), text);
             Text.Font = GameFont.Small;
             GUI.color = Color.white;
         }
@@ -143,7 +175,7 @@ namespace GraphicSetter
         public void SetFilter(float curY)
         {
             Widgets.Label(new Rect(0, curY, 200, 25f), "Texture Filtering: ");
-            Rect button1 = new Rect(20, curY + 25f, 80, 22f);
+            Rect button1 = new Rect(20, curY + 25f, 85, 22f);
             Rect button2 = new Rect(button1.x, button1.yMax, button1.width, button1.height);
             if (Widgets.RadioButtonLabeled(button1,FilterMode.Bilinear.ToString(), filterMode == FilterMode.Bilinear))
             {
@@ -160,6 +192,7 @@ namespace GraphicSetter
             base.ExposeData();
             Scribe_Values.Look(ref anisoLevel, "anisoLevel");
             Scribe_Values.Look(ref useMipMap, "useMipMap");
+            Scribe_Values.Look(ref compressImages, "compressImages");
             Scribe_Values.Look(ref filterMode, "filterMode");
             Scribe_Values.Look(ref mipMapBias, "mipMapBias");
         }
