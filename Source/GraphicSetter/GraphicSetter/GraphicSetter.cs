@@ -1,12 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using Harmony;
+using System.IO;
+using RimWorld.IO;
+using RuntimeAudioClipLoader;
+using UnityEngine;
+using HarmonyLib;
 using RimWorld;
 using Verse;
-using UnityEngine;
-using System.IO;
 
 namespace GraphicSetter
 {
@@ -18,33 +18,17 @@ namespace GraphicSetter
         {
             Log.Message("Graphics Setter - Loaded");
             settings = GetSettings<GraphicsSettings>();
-            HarmonyInstance graphics = HarmonyInstance.Create("com.graphicsetter.rimworld.mod");
+            Harmony graphics = new Harmony("com.telefonmast.graphicssettings.rimworld.mod");
             graphics.PatchAll();
         }
 
         [HarmonyPatch(typeof(ModContentLoader<Texture2D>))]
-        [HarmonyPatch("LoadPNG")]
+        [HarmonyPatch("LoadTexture")]
         public static class LoadPNGPatch
         {
-            static bool Prefix(string filePath, ref Texture2D __result)
+            static bool Prefix(VirtualFile file, ref Texture2D __result)
             {
-                Texture2D texture2D = null;
-                if (File.Exists(filePath))
-                {
-                    byte[] data = File.ReadAllBytes(filePath);
-                    texture2D = new Texture2D(2, 2, TextureFormat.Alpha8, settings.useMipMap);
-                    texture2D.LoadImage(data);
-                    if (settings.compressImages)
-                    {
-                        texture2D.Compress(true);
-                    }
-                    texture2D.name = Path.GetFileNameWithoutExtension(filePath);
-                    texture2D.filterMode = settings.filterMode;
-                    texture2D.anisoLevel = settings.anisoLevel;
-                    texture2D.mipMapBias = settings.mipMapBias;
-                    texture2D.Apply(true, true);
-                }
-                __result = texture2D;
+                GraphicsSettings.LoadTexture(file, ref __result);
                 return false;
             }
         }
@@ -66,15 +50,27 @@ namespace GraphicSetter
         }
     }
 
-    public class GraphicsSettings : ModSettings
+    public class SettingsGroup
     {
         public int anisoLevel = 2;
         public FilterMode filterMode = FilterMode.Bilinear;
         public bool useMipMap = true;
         public bool compressImages = true;
         public float mipMapBias = 0f;
+    }
+
+    public class GraphicsSettings : ModSettings
+    {
+        private SettingsGroup lastSettings = new SettingsGroup();
+
+        public int anisoLevel = 2;
+        public FilterMode filterMode = FilterMode.Bilinear;
+        public bool useMipMap = true;
+        public bool compressImages = true;
+        public float mipMapBias = 0f;
+
         public readonly FloatRange anisoRange = new FloatRange(1, 9);
-        public readonly FloatRange MipMapBiasRange = new FloatRange(-0.6f, 1f);
+        public readonly FloatRange MipMapBiasRange = new FloatRange(-1f, 1f);
 
         public void DoSettingsWindowContents(Rect inRect)
         {
@@ -84,7 +80,6 @@ namespace GraphicSetter
             Text.Anchor = TextAnchor.UpperCenter;
             if (useMipMap)
                 mipMapBias = LabeledSlider("MipMap Bias", ref curY, MipMapBiasRange, mipMapBias, "Sharpest", "Blurriest", "This value changes how blurry textures can get depending on zoom, it is recommended to be equal or below 0.", 0.05f);
-
             curY += 10f;
             anisoLevel = (int)LabeledSlider("Anisotropic Filter Level", ref curY, anisoRange, (float)anisoLevel, "", "", "Set the level of anisotropic filtering, higher levels may reduce performance on older graphics cards.", 1);
             Text.Anchor = 0;
@@ -115,7 +110,6 @@ namespace GraphicSetter
                 useMipMap = true;
                 mipMapBias = 0;
             }
-
             if (Widgets.ButtonText(ultra, "Redefined"))
             {
                 anisoLevel = 9;
@@ -125,15 +119,93 @@ namespace GraphicSetter
                 mipMapBias = -0.6f;
             }
 
-
-            GUI.color = Color.red;
-            Text.Font = GameFont.Medium;
-            string text = "Game needs to be restarted for changes to take effect!";
-            Vector2 size = Text.CalcSize(text);
-            float x2 = (inRect.width - size.x) / 2f;
-            Widgets.Label(new Rect(x2, inRect.yMax - 30, size.x, size.y), text);
+            if (AnySettingsChanged())
+            {
+                GUI.color = Color.red;
+                Text.Font = GameFont.Medium;
+                //string text = "Reloading may take a while and freeze your game.";
+                string text = "You will have to restart the game to apply changes!";
+                Vector2 size = Text.CalcSize(text);
+                float x2 = (inRect.width - size.x) / 2f;
+                float x3 = (inRect.width - 150) / 2f;
+                float y2 = inRect.yMax - 100;
+                Widgets.Label(new Rect(x2, y2, size.x, size.y), text);
+                if (Widgets.ButtonText(new Rect(x3, inRect.yMax - 55, 150, 45), "Restart Game", true, true))
+                {
+                    this.Write();
+                    GenCommandLine.Restart();
+                }
+            }
             Text.Font = GameFont.Small;
             GUI.color = Color.white;
+        }
+
+        private bool AnySettingsChanged()
+        {
+            if (anisoLevel != lastSettings.anisoLevel)
+                return true;
+            if (compressImages != lastSettings.compressImages)
+                return true;
+            if (filterMode != lastSettings.filterMode)
+                return true;
+            if (mipMapBias != lastSettings.mipMapBias)
+                return true;
+            if (useMipMap != lastSettings.useMipMap)
+                return true;
+            return false;
+        }
+
+        public static void LoadTexture(VirtualFile file, ref Texture2D __result)
+        {
+            Texture2D texture2D = null;
+            var settings = GraphicSetter.settings;
+            if (file.Exists)
+            {
+                byte[] data = file.ReadAllBytes();
+                texture2D = new Texture2D(2, 2, TextureFormat.Alpha8, settings.useMipMap);
+                texture2D.LoadImage(data);
+                if (settings.compressImages)
+                {
+                    texture2D.Compress(true);
+                }
+                texture2D.name = Path.GetFileNameWithoutExtension(file.Name);
+                texture2D.filterMode = settings.filterMode;
+                texture2D.anisoLevel = settings.anisoLevel;
+                texture2D.mipMapBias = settings.mipMapBias;
+                texture2D.Apply(true, true);
+            }
+            __result = texture2D;
+        }
+
+        //TODO: Figure a way to use this
+        private void ReloadTextures()
+        {
+            int i = 0,
+                k = 0;
+            foreach (ModContentPack mod in LoadedModManager.RunningMods)
+            {
+                i++;
+                ModContentHolder<Texture2D> mch = Traverse.Create(mod).Field("textures").GetValue<ModContentHolder<Texture2D>>();
+                Log.Message("Got modcontentholder for " + mod.PackageId + " with " + mch.contentList.Count + " textures.");
+                mod.assemblies.ReloadAll();
+                mch.ClearDestroy();
+                mch.ReloadAll();
+                mod.AllDefs.Do<Def>(delegate (Def def)
+                {
+                    if(def is ThingDef thingDef)
+                    {
+                        if(thingDef.graphic != null)
+                            thingDef.graphic = null;
+                        if (thingDef.graphicData != null)
+                        {
+                            Traverse.Create(thingDef.graphicData).Field("cachedGraphic").SetValue(null);
+                            thingDef.graphic = thingDef.graphicData.Graphic;
+                        }
+                    }
+                });
+                k += mch.contentList.Count;
+            }
+            Log.Message("Reloaded " + k + " textures for: " + i + " mods");
         }
 
         public void CheckBox(string label, ref float curY, ref bool flag)
@@ -195,6 +267,16 @@ namespace GraphicSetter
             Scribe_Values.Look(ref compressImages, "compressImages");
             Scribe_Values.Look(ref filterMode, "filterMode");
             Scribe_Values.Look(ref mipMapBias, "mipMapBias");
+
+            if(Scribe.mode == LoadSaveMode.PostLoadInit)
+            {
+                lastSettings = new SettingsGroup();
+                lastSettings.anisoLevel = anisoLevel;
+                lastSettings.useMipMap = useMipMap;
+                lastSettings.compressImages = compressImages;
+                lastSettings.filterMode = filterMode;
+                lastSettings.mipMapBias = mipMapBias;
+            }
         }
     }
 }
