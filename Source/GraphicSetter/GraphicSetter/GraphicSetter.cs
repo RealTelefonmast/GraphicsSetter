@@ -1,11 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Reflection.Emit;
 using RimWorld.IO;
 using RuntimeAudioClipLoader;
 using UnityEngine;
 using HarmonyLib;
 using RimWorld;
+using UnityEngine.Profiling;
+using UnityEngine.Rendering;
 using Verse;
 
 namespace GraphicSetter
@@ -13,11 +19,14 @@ namespace GraphicSetter
     public class GraphicSetter : Mod
     {
         public static GraphicsSettings settings;
+        public static MemoryData memData;
 
         public GraphicSetter(ModContentPack content) : base(content)
         {
             Log.Message("Graphics Setter - Loaded");
             settings = GetSettings<GraphicsSettings>();
+            memData = new MemoryData();
+            //profiler = new ResourceProfiler();
             Harmony graphics = new Harmony("com.telefonmast.graphicssettings.rimworld.mod");
             graphics.PatchAll();
         }
@@ -28,8 +37,73 @@ namespace GraphicSetter
         {
             static bool Prefix(VirtualFile file, ref Texture2D __result)
             {
-                GraphicsSettings.LoadTexture(file, ref __result);
+                __result = StaticTools.LoadTexture(file);
                 return false;
+            }
+        }
+
+        //
+        [HarmonyPatch(typeof(MainTabWindow_Menu))]
+        [HarmonyPatch("RequestedTabSize", MethodType.Getter)]
+        static class MainTabWindow_Menu_RequestedTabSize_Path
+        {
+            static void Postfix(ref Vector2 __result)
+            {
+                __result.y += DoMainMenuControlsPatch.addedHeight;
+            }
+        }
+
+        [HarmonyPatch(typeof(MainTabWindow_Menu))]
+        [HarmonyPatch("DoWindowContents")]
+        static class MainTabWindow_Menu_DoWindowContents_Path
+        {
+            static void Prefix(ref Rect rect)
+            {
+                rect.height += DoMainMenuControlsPatch.addedHeight;
+            }
+        }
+
+        [HarmonyPatch(typeof(MainMenuDrawer))]
+        [HarmonyPatch("DoMainMenuControls")]
+        public static class DoMainMenuControlsPatch
+        {
+            public static float addedHeight = 45f + 7f;
+            private static MethodInfo ListingOption = SymbolExtensions.GetMethodInfo(() => AdjustList(null));
+
+            static void AdjustList(List<ListableOption> optList)
+            {
+                var label = "Options".Translate();
+                var idx = optList.FirstIndexOf(opt => opt.label == label);
+                if (idx > 0 && idx < optList.Count) optList.Insert(idx, new ListableOption("Graphics Settings", delegate
+                {
+                    var dialog = new Dialog_ModSettings();
+                    var me = LoadedModManager.GetMod<GraphicSetter>();
+                    StaticContent.selModByRef(dialog) = me;
+                    Find.WindowStack.Add(dialog);
+                }, null));
+            }
+
+            static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+            {
+                var m_DrawOptionListing = SymbolExtensions.GetMethodInfo(() => OptionListingUtility.DrawOptionListing(Rect.zero, null));
+
+                var instructionsList = instructions.ToList();
+                var patched = false;
+                for (var i = 0; i < instructionsList.Count; i++)
+                {
+                    var instruction = instructionsList[i];
+                    if (i + 2 < instructionsList.Count)
+                    {
+                        var checkingIns = instructionsList[i + 2];
+                        if (!patched && checkingIns != null && checkingIns.Calls(m_DrawOptionListing))
+                        {
+                            yield return new CodeInstruction(OpCodes.Ldloc_2);
+                            yield return new CodeInstruction(OpCodes.Call, ListingOption);
+                            patched = true;
+                        }
+                    }
+                    yield return instruction;
+                }
             }
         }
 
@@ -55,7 +129,6 @@ namespace GraphicSetter
         public int anisoLevel = 2;
         public FilterMode filterMode = FilterMode.Bilinear;
         public bool useMipMap = true;
-        public bool compressImages = true;
         public float mipMapBias = 0f;
     }
 
@@ -63,19 +136,27 @@ namespace GraphicSetter
     {
         private SettingsGroup lastSettings = new SettingsGroup();
 
+        public bool CausedMemOverflow = false;
+
         public int anisoLevel = 2;
         public FilterMode filterMode = FilterMode.Bilinear;
         public bool useMipMap = true;
-        public bool compressImages = true;
         public float mipMapBias = 0f;
 
         public readonly FloatRange anisoRange = new FloatRange(1, 9);
-        public readonly FloatRange MipMapBiasRange = new FloatRange(-1f, 1f);
+        public readonly FloatRange MipMapBiasRange = new FloatRange(-1f, 0.25f);
+
+        private bool DoFirstTime = false;
 
         public void DoSettingsWindowContents(Rect inRect)
         {
+            if (!DoFirstTime)
+            {
+                GraphicSetter.memData.Notify_Recalculate();
+                DoFirstTime = true;
+            }
+
             float curY = 50f;
-            CheckBox("Compress Textures", ref curY, ref compressImages);
             CheckBox("(Recommended) Activate Mip-Mapping", ref curY, ref useMipMap);
             Text.Anchor = TextAnchor.UpperCenter;
             if (useMipMap)
@@ -98,26 +179,24 @@ namespace GraphicSetter
             {
                 anisoLevel = 2;
                 filterMode = FilterMode.Bilinear;
-                compressImages = true;
                 useMipMap = true;
                 mipMapBias = 0;
             }
             if (Widgets.ButtonText(better, "Better"))
             {
-                anisoLevel = 2;
+                anisoLevel = 9;
                 filterMode = FilterMode.Trilinear;
-                compressImages = false;
                 useMipMap = true;
-                mipMapBias = 0;
+                mipMapBias = -0.3f;
             }
             if (Widgets.ButtonText(ultra, "Redefined"))
             {
                 anisoLevel = 9;
                 filterMode = FilterMode.Trilinear;
-                compressImages = false;
                 useMipMap = true;
-                mipMapBias = -0.6f;
+                mipMapBias = -1f;
             }
+
 
             if (AnySettingsChanged())
             {
@@ -135,16 +214,21 @@ namespace GraphicSetter
                     this.Write();
                     GenCommandLine.Restart();
                 }
+                //...
+                Text.Font = GameFont.Small;
+                GUI.color = Color.white;
             }
-            Text.Font = GameFont.Small;
-            GUI.color = Color.white;
+
+            Rect rightMost = inRect.RightPartPixels(325);
+            var memDataRect = rightMost.ContractedBy(5);
+            GUI.BeginGroup(memDataRect);
+            GraphicSetter.memData.DrawMemoryData(new Rect(0, 0, memDataRect.width, memDataRect.height));
+            GUI.EndGroup();
         }
 
-        private bool AnySettingsChanged()
+        public bool AnySettingsChanged()
         {
             if (anisoLevel != lastSettings.anisoLevel)
-                return true;
-            if (compressImages != lastSettings.compressImages)
                 return true;
             if (filterMode != lastSettings.filterMode)
                 return true;
@@ -153,28 +237,6 @@ namespace GraphicSetter
             if (useMipMap != lastSettings.useMipMap)
                 return true;
             return false;
-        }
-
-        public static void LoadTexture(VirtualFile file, ref Texture2D __result)
-        {
-            Texture2D texture2D = null;
-            var settings = GraphicSetter.settings;
-            if (file.Exists)
-            {
-                byte[] data = file.ReadAllBytes();
-                texture2D = new Texture2D(2, 2, TextureFormat.Alpha8, settings.useMipMap);
-                texture2D.LoadImage(data);
-                if (settings.compressImages)
-                {
-                    texture2D.Compress(true);
-                }
-                texture2D.name = Path.GetFileNameWithoutExtension(file.Name);
-                texture2D.filterMode = settings.filterMode;
-                texture2D.anisoLevel = settings.anisoLevel;
-                texture2D.mipMapBias = settings.mipMapBias;
-                texture2D.Apply(true, true);
-            }
-            __result = texture2D;
         }
 
         //TODO: Figure a way to use this
@@ -264,16 +326,15 @@ namespace GraphicSetter
             base.ExposeData();
             Scribe_Values.Look(ref anisoLevel, "anisoLevel");
             Scribe_Values.Look(ref useMipMap, "useMipMap");
-            Scribe_Values.Look(ref compressImages, "compressImages");
             Scribe_Values.Look(ref filterMode, "filterMode");
             Scribe_Values.Look(ref mipMapBias, "mipMapBias");
+            Scribe_Values.Look(ref CausedMemOverflow, "causedOverflow");
 
             if(Scribe.mode == LoadSaveMode.PostLoadInit)
             {
                 lastSettings = new SettingsGroup();
                 lastSettings.anisoLevel = anisoLevel;
                 lastSettings.useMipMap = useMipMap;
-                lastSettings.compressImages = compressImages;
                 lastSettings.filterMode = filterMode;
                 lastSettings.mipMapBias = mipMapBias;
             }
