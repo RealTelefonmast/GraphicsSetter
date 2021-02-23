@@ -120,6 +120,10 @@ namespace GraphicSetter
                     {
                         textureFormat = TextureFormat.DXT5;
                     }
+                    else if (fourCCEquals(dds_pxlf_dwFourCC, "DX10"))
+                    {
+                        textureFormat = TextureFormat.BC7;
+                    }
                 }
                 else if (rgb && (rgb888 || bgr888))
                 {
@@ -150,11 +154,19 @@ namespace GraphicSetter
                 else
                 {
                     error =
-                        "Only DXT1, DXT5, A8, RGB24, BGR24, RGBA32, BGBR32, RGB565, ARGB4444 and RGBA4444 are supported";
+                        "Only BC7, DXT1, DXT5, A8, RGB24, BGR24, RGBA32, BGBR32, RGB565, ARGB4444 and RGBA4444 are supported";
                     return null;
                 }
 
-                long dataBias = 128;
+                long dataBias;
+                if (textureFormat != TextureFormat.BC7)
+                {
+                    dataBias = 128;
+                }
+                else
+                {
+                    dataBias = 148;
+                }
 
                 /*
                 if (GraphicSetter.settings.mipMapBias != 0)
