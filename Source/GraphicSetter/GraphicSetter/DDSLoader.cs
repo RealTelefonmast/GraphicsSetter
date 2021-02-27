@@ -42,7 +42,7 @@ namespace GraphicSetter
                     return null;
                 }
 
-                int dwSize = (int) reader.ReadUInt32();
+                int dwSize = (int)reader.ReadUInt32();
 
                 //this header byte should be 124 for DDS image files
                 if (dwSize != 124)
@@ -51,13 +51,13 @@ namespace GraphicSetter
                     return null;
                 }
 
-                int dwFlags = (int) reader.ReadUInt32();
-                int dwHeight = (int) reader.ReadUInt32();
-                int dwWidth = (int) reader.ReadUInt32();
+                int dwFlags = (int)reader.ReadUInt32();
+                int dwHeight = (int)reader.ReadUInt32();
+                int dwWidth = (int)reader.ReadUInt32();
 
-                int dwPitchOrLinearSize = (int) reader.ReadUInt32();
-                int dwDepth = (int) reader.ReadUInt32();
-                int dwMipMapCount = (int) reader.ReadUInt32();
+                int dwPitchOrLinearSize = (int)reader.ReadUInt32();
+                int dwDepth = (int)reader.ReadUInt32();
+                int dwMipMapCount = (int)reader.ReadUInt32();
 
                 if ((dwFlags & DDSD_MIPMAPCOUNT_BIT) == 0)
                 {
@@ -82,11 +82,11 @@ namespace GraphicSetter
                 uint dds_pxlf_dwBBitMask = reader.ReadUInt32();
                 uint dds_pxlf_dwABitMask = reader.ReadUInt32();
 
-                int dwCaps = (int) reader.ReadUInt32();
-                int dwCaps2 = (int) reader.ReadUInt32();
-                int dwCaps3 = (int) reader.ReadUInt32();
-                int dwCaps4 = (int) reader.ReadUInt32();
-                int dwReserved2 = (int) reader.ReadUInt32();
+                int dwCaps = (int)reader.ReadUInt32();
+                int dwCaps2 = (int)reader.ReadUInt32();
+                int dwCaps3 = (int)reader.ReadUInt32();
+                int dwCaps4 = (int)reader.ReadUInt32();
+                int dwReserved2 = (int)reader.ReadUInt32();
 
                 TextureFormat textureFormat = TextureFormat.ARGB32;
                 bool isCompressed = false;
@@ -153,8 +153,7 @@ namespace GraphicSetter
                 }
                 else
                 {
-                    error =
-                        "Only BC7, DXT1, DXT5, A8, RGB24, BGR24, RGBA32, BGBR32, RGB565, ARGB4444 and RGBA4444 are supported";
+                    error = "Only BC7, DXT1, DXT5, A8, RGB24, BGR24, RGBA32, BGBR32, RGB565, ARGB4444 and RGBA4444 are supported";
                     return null;
                 }
 
@@ -174,13 +173,11 @@ namespace GraphicSetter
                     float bias = GraphicSetter.settings.mipMapBias;
                     int blockSize = textureFormat == TextureFormat.DXT1 ? 8 : 16;
                     int levels = Math.Min(bias, dwMipMapCount - 1);
-
                     for (int i = 0; i < levels; ++i)
                     {
                         dataBias += isCompressed
                             ? ((dwWidth + 3) / 4) * ((dwHeight + 3) / 4) * blockSize
                             : dwWidth * dwHeight * pixelSize;
-
                         dwWidth = Math.Max(1, dwWidth / 2);
                         dwHeight = Math.Max(1, dwHeight / 2);
                     }
@@ -189,7 +186,7 @@ namespace GraphicSetter
 
                 long dxtBytesLength = reader.BaseStream.Length - dataBias;
                 reader.BaseStream.Seek(dataBias, SeekOrigin.Begin);
-                byte[] dxtBytes = reader.ReadBytes((int) dxtBytesLength);
+                byte[] dxtBytes = reader.ReadBytes((int)dxtBytesLength);
 
                 // Swap red and blue.
                 if (!isCompressed && bgr888)

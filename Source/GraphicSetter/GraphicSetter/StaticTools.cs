@@ -8,7 +8,6 @@ namespace GraphicSetter
     public static class StaticTools
     {
         //
-
         public static Texture2D LoadTexture(VirtualFile file, bool readable = false)
         {
             Texture2D texture2D = null;
@@ -22,7 +21,7 @@ namespace GraphicSetter
             else if(file.Exists)
             {
                 byte[] data = file.ReadAllBytes();
-                texture2D = new Texture2D(2, 2, TextureFormat.DXT5, settings.useMipMap);
+                texture2D = new Texture2D(2, 2, TextureFormat.Alpha8, settings.useMipMap);
                 texture2D.LoadImage(data);
             }
             else
@@ -30,7 +29,7 @@ namespace GraphicSetter
                 return null;
             }
 
-            //texture2D.Compress(true);
+            texture2D.Compress(true);
             texture2D.name = Path.GetFileNameWithoutExtension(file.Name);
             texture2D.filterMode = settings.filterMode;
             texture2D.anisoLevel = settings.anisoLevel;

@@ -42,45 +42,32 @@ namespace GraphicSetter
             }
         }
 
-        //
-        [HarmonyPatch(typeof(MainTabWindow_Menu))]
-        [HarmonyPatch("RequestedTabSize", MethodType.Getter)]
-        static class MainTabWindow_Menu_RequestedTabSize_Path
-        {
-            static void Postfix(ref Vector2 __result)
-            {
-                __result.y += DoMainMenuControlsPatch.addedHeight;
-            }
-        }
-
-        [HarmonyPatch(typeof(MainTabWindow_Menu))]
-        [HarmonyPatch("DoWindowContents")]
-        static class MainTabWindow_Menu_DoWindowContents_Path
-        {
-            static void Prefix(ref Rect rect)
-            {
-                rect.height += DoMainMenuControlsPatch.addedHeight;
-            }
-        }
-
         [HarmonyPatch(typeof(MainMenuDrawer))]
         [HarmonyPatch("DoMainMenuControls")]
         public static class DoMainMenuControlsPatch
         {
             public static float addedHeight = 45f + 7f;
+            public static List<ListableOption> OptionList;
             private static MethodInfo ListingOption = SymbolExtensions.GetMethodInfo(() => AdjustList(null));
 
             static void AdjustList(List<ListableOption> optList)
             {
                 var label = "Options".Translate();
                 var idx = optList.FirstIndexOf(opt => opt.label == label);
-                if (idx > 0 && idx < optList.Count) optList.Insert(idx, new ListableOption("Graphics Settings", delegate
+                if (idx > 0 && idx < optList.Count) optList.Insert(idx + 1, new ListableOption("Graphics Settings", delegate
                 {
                     var dialog = new Dialog_ModSettings();
                     var me = LoadedModManager.GetMod<GraphicSetter>();
                     StaticContent.selModByRef(dialog) = me;
                     Find.WindowStack.Add(dialog);
                 }, null));
+                OptionList = optList;
+            }
+
+            static bool Prefix(ref Rect rect, bool anyMapFiles)
+            {
+                rect = new Rect(rect.x, rect.y, rect.width, rect.height + addedHeight);
+                return true;
             }
 
             static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
@@ -106,6 +93,7 @@ namespace GraphicSetter
                 }
             }
         }
+        
 
         public override void WriteSettings()
         {
