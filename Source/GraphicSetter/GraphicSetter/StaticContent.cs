@@ -11,7 +11,18 @@ namespace GraphicSetter
     {
         //Inspired by Brrainz' patches
         public static AccessTools.FieldRef<Dialog_ModSettings, Mod> selModByRef = FieldRefAccess<Dialog_ModSettings, Mod>("selMod");
+        private static GameObject RoutineHolder;
+        public static GraphicsDriver CoroutineDriver;
+        public static MemoryData MemoryData;
 
+        static StaticContent()
+        {
+            MemoryData = new MemoryData();
+            RoutineHolder = new GameObject("GraphicsSettingsDriver");
+            UnityEngine.Object.DontDestroyOnLoad(RoutineHolder);
+            RoutineHolder.AddComponent<GraphicsDriver>();
+            CoroutineDriver = RoutineHolder.GetComponent<GraphicsDriver>();
+        }
 
         public static readonly Texture2D clear = SolidColorMaterials.NewSolidColorTexture(Color.clear);
         public static readonly Texture2D grey = SolidColorMaterials.NewSolidColorTexture(Color.grey);

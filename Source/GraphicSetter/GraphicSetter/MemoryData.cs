@@ -14,7 +14,8 @@ namespace GraphicSetter
         private static readonly Dictionary<ModContentPack, long> MemoryUsageByMod = new Dictionary<ModContentPack, long>();
 
         private static IEnumerable<ModContentPack> CurrentMods => LoadedModManager.RunningMods.Where(t => t.GetContentHolder<Texture2D>().contentList.Any());
-        private bool doRecalc = false;
+        private bool shouldRecalc = false;
+        private bool shouldStop = false;
 
         private long TotalBytes => MemoryUsageByMod.Sum(t => t.Value);
 
@@ -22,7 +23,7 @@ namespace GraphicSetter
         private long TotalVRAM => SystemInfo.graphicsMemorySize * 1000000L;
         private float TotalPctUsage => (float)(TotalBytes / (double)TotalVRAM);
 
-        private bool Calculating => doRecalc;
+        private bool Calculating => shouldRecalc;
 
         private static readonly float CriticalPct = 0.8f;//0.75f;
 
@@ -30,34 +31,58 @@ namespace GraphicSetter
 
         public bool MEMOVERFLOW => TotalPctUsage > 1f;
 
-        public MemoryData()
+
+        public void Notify_SettingsChanged()
         {
+            shouldRecalc = false;
+            shouldStop = false;
+            MemoryUsageByMod.Clear();
         }
 
-        public void Notify_Recalculate()
+        public Coroutine routine;
+
+        public void Notify_ChangeState()
         {
-            _ = Find.Root.StartCoroutine(DoTheThing());
-            doRecalc = true;
+            if (shouldRecalc)
+            {
+                shouldStop = !shouldStop;
+                return;
+            }
+            routine = StaticContent.CoroutineDriver.StartCoroutine(DoTheThing());
+            shouldRecalc = true;
         }
 
         public IEnumerator DoTheThing()
         {
             MemoryUsageByMod.Clear();
-            foreach (var mod in CurrentMods)
+            int count = CurrentMods.Count();
+            int k = 0;
+            while (shouldStop || k < count)
             {
+                if (shouldStop)
+                {
+                    yield return null;
+                    continue;
+                }
+                var mod = CurrentMods.ElementAt(k);
                 MemoryUsageByMod.Add(mod, 0);
                 Dictionary<string, FileInfo> allFilesForMod = ModContentPack.GetAllFilesForMod(mod, GenFilePaths.ContentPath<Texture2D>(), (ModContentLoader<Texture2D>.IsAcceptableExtension));
                 int i = 0;
-                foreach (KeyValuePair<string, FileInfo> keyValuePair in allFilesForMod)
+                while (shouldStop || i < allFilesForMod.Count)
                 {
-                    MemoryUsageByMod[mod] += StaticTools.TextureSize(new VirtualFileWrapper(keyValuePair.Value));
-                    //RawMemoryUsageByMod[mod] += fileBytes;
+                    if (shouldStop)
+                    {
+                        yield return null;
+                        continue;
+                    }
+                    var pair = allFilesForMod.ElementAt(i);
+                    MemoryUsageByMod[mod] += StaticTools.TextureSize(new VirtualFileWrapper(pair.Value));
                     i++;
-                    if(i % 3 == 0) yield return null;
+                    if (i % 3 == 0) yield return null;
                 }
-                yield return null;
+                k++;
             }
-            doRecalc = false;
+            shouldRecalc = false;
             GraphicSetter.settings.CausedMemOverflow = MEMOVERFLOW;
         }
 
@@ -102,7 +127,6 @@ namespace GraphicSetter
             Rect bottomHalf = rect.BottomPart(0.3f);
             DrawModList(topHalf);
             WriteProcessingData(bottomHalf);
-
         }
 
         public void DrawModList(Rect rect)
@@ -137,9 +161,10 @@ namespace GraphicSetter
             Rect buttonRect = new Rect(0, 5, rect.width * 0.2f, 22);
             Rect barRect = new Rect(buttonRect.xMax + 5, 5, rect.width - buttonRect.width - 5, 22);
             float curY = buttonRect.height;
-            if (Widgets.ButtonText(buttonRect, "Recalc", true, false))
+            string text = shouldRecalc ? (shouldStop ? "Continue" : "Stop" ) : "Recalc";
+            if (Widgets.ButtonText(buttonRect, text, true, false))
             {
-                Notify_Recalculate();
+                Notify_ChangeState();
             }
             Widgets.FillableBar(barRect, TotalPctUsage, StaticContent.blue, Texture2D.blackTexture, true);
             Text.Anchor = TextAnchor.MiddleCenter;

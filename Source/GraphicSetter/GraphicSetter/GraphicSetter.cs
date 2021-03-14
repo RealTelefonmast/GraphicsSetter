@@ -19,13 +19,11 @@ namespace GraphicSetter
     public class GraphicSetter : Mod
     {
         public static GraphicsSettings settings;
-        public static MemoryData memData;
 
         public GraphicSetter(ModContentPack content) : base(content)
         {
             Log.Message("Graphics Setter - Loaded");
             settings = GetSettings<GraphicsSettings>();
-            memData = new MemoryData();
             //profiler = new ResourceProfiler();
             Harmony graphics = new Harmony("com.telefonmast.graphicssettings.rimworld.mod");
             graphics.PatchAll();
@@ -140,7 +138,7 @@ namespace GraphicSetter
         {
             if (!DoFirstTime)
             {
-                GraphicSetter.memData.Notify_Recalculate();
+                StaticContent.MemoryData.Notify_ChangeState();
                 DoFirstTime = true;
             }
 
@@ -163,6 +161,7 @@ namespace GraphicSetter
             Rect vanilla = new Rect(x1,presetLabel.yMax,120,35);
             Rect better = new Rect(x1, vanilla.yMax + 5, 120, 35);
             Rect ultra = new Rect(x1, better.yMax + 5, 120, 35);
+
             if (Widgets.ButtonText(vanilla, "Vanilla"))
             {
                 anisoLevel = 2;
@@ -185,12 +184,10 @@ namespace GraphicSetter
                 mipMapBias = -1f;
             }
 
-
             if (AnySettingsChanged())
             {
                 GUI.color = Color.red;
                 Text.Font = GameFont.Medium;
-                //string text = "Reloading may take a while and freeze your game.";
                 string text = "You will have to restart the game to apply changes!";
                 Vector2 size = Text.CalcSize(text);
                 float x2 = (inRect.width - size.x) / 2f;
@@ -210,7 +207,7 @@ namespace GraphicSetter
             Rect rightMost = inRect.RightPartPixels(325);
             var memDataRect = rightMost.ContractedBy(5);
             GUI.BeginGroup(memDataRect);
-            GraphicSetter.memData.DrawMemoryData(new Rect(0, 0, memDataRect.width, memDataRect.height));
+            StaticContent.MemoryData.DrawMemoryData(new Rect(0, 0, memDataRect.width, memDataRect.height));
             GUI.EndGroup();
         }
 
