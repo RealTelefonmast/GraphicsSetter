@@ -19,6 +19,8 @@ namespace GraphicSetter
                 if (File.Exists(ddsExtensionPath))
                 {
                     texture2D = DDSLoader.LoadDDS(ddsExtensionPath);
+                    if(!DDSLoader.error.NullOrEmpty())
+                        Log.Warning("DDS Error: " + DDSLoader.error);
                     if(texture2D == null)
                         Log.Warning("Couldn't load .dds from " + file.Name + " loading as png instead.");
                 }
@@ -28,9 +30,10 @@ namespace GraphicSetter
                     texture2D = new Texture2D(2, 2, TextureFormat.Alpha8, settings.useMipMap);
                     texture2D.LoadImage(data);
                 }
-                else
+
+                if (texture2D == null)
                 {
-                    return null;
+                    throw new Exception("Could not load texture at " + file.FullPath);
                 }
 
                 texture2D.Compress(true);

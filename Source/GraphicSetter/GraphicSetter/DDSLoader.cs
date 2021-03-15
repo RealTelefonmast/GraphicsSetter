@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using UnityEngine;
@@ -17,7 +18,7 @@ namespace GraphicSetter
         private const uint DDPF_LUMINANCE = 0x00020000;
         private const uint DDPF_NORMAL = 0x80000000;
 
-        private static string error;
+        public static string error;
 
         // DDS Texture loader inspired by
         // http://answers.unity3d.com/questions/555984/can-you-load-dds-textures-during-runtime.html#answer-707772
@@ -167,23 +168,7 @@ namespace GraphicSetter
                     dataBias = 148;
                 }
 
-                /*
-                if (GraphicSetter.settings.mipMapBias != 0)
-                {
-                    float bias = GraphicSetter.settings.mipMapBias;
-                    int blockSize = textureFormat == TextureFormat.DXT1 ? 8 : 16;
-                    int levels = Math.Min(bias, dwMipMapCount - 1);
-                    for (int i = 0; i < levels; ++i)
-                    {
-                        dataBias += isCompressed
-                            ? ((dwWidth + 3) / 4) * ((dwHeight + 3) / 4) * blockSize
-                            : dwWidth * dwHeight * pixelSize;
-                        dwWidth = Math.Max(1, dwWidth / 2);
-                        dwHeight = Math.Max(1, dwHeight / 2);
-                    }
-                }
-                */
-
+                
                 long dxtBytesLength = reader.BaseStream.Length - dataBias;
                 reader.BaseStream.Seek(dataBias, SeekOrigin.Begin);
                 byte[] dxtBytes = reader.ReadBytes((int)dxtBytesLength);
