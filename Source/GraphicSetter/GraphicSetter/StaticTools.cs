@@ -8,11 +8,47 @@ namespace GraphicSetter
 {
     public static class StaticTools
     {
+        public static void FillableBarLabeled(Rect rect, float fillPercent, string label, Color? fillCol, Color? bgCol, bool doBorder)
+        {
+            FillableBar(rect, fillPercent, fillCol, bgCol, doBorder);
+
+            if (!label.NullOrEmpty())
+            {
+                Rect rect2 = rect;
+                rect2.xMin += 2f;
+                rect2.xMax -= 2f;
+                if (Text.Anchor >= TextAnchor.UpperLeft)
+                {
+                    rect2.height += 14f;
+                }
+                Text.Font = GameFont.Tiny;
+                Text.WordWrap = false;
+                Widgets.Label(rect2, label);
+                Text.WordWrap = true;
+            }
+        }
+
+        public static void FillableBar(Rect rect, float fillPercent, Color? fillCol, Color? bgCol, bool doBorder)
+        {
+            if (doBorder)
+            {
+                GUI.DrawTexture(rect, BaseContent.BlackTex);
+                rect = rect.ContractedBy(3f);
+            }
+            if (bgCol != null)
+            {
+                Widgets.DrawBoxSolid(rect, bgCol.Value);
+                //GUI.DrawTexture(rect, bgTex);
+            }
+            rect.width *= fillPercent;
+            Widgets.DrawBoxSolid(rect, fillCol.Value);
+        }
+
         //
         public static Texture2D LoadTexture(VirtualFile file, bool readable = false)
         {
             Texture2D texture2D = null;
-            var settings = GraphicSetter.settings;
+            var settings = GraphicSetter.settings.mainSettings;
             try
             {
                 string ddsExtensionPath = Path.ChangeExtension(file.FullPath, ".dds");
@@ -28,6 +64,7 @@ namespace GraphicSetter
                 {
                     byte[] data = file.ReadAllBytes();
                     texture2D = new Texture2D(2, 2, TextureFormat.Alpha8, settings.useMipMap);
+                   
                     texture2D.LoadImage(data);
                 }
 

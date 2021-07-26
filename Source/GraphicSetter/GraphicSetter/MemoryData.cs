@@ -13,11 +13,16 @@ namespace GraphicSetter
         //private static Dictionary<ModContentPack, long> RawMemoryUsageByMod = new Dictionary<ModContentPack, long>();
         private static readonly Dictionary<ModContentPack, long> MemoryUsageByMod = new Dictionary<ModContentPack, long>();
 
+        private static Color ListingBG = new ColorInt(32, 36, 40).ToColor;
+        private static Color NiceBlue = new ColorInt(38, 169, 224).ToColor;
+
         private static IEnumerable<ModContentPack> CurrentMods => LoadedModManager.RunningMods.Where(t => t.GetContentHolder<Texture2D>().contentList.Any());
         private bool shouldRecalc = false;
         private bool shouldStop = false;
 
         private long TotalBytes => MemoryUsageByMod.Sum(t => t.Value);
+
+        private long LargestModSize { get; set; }
 
         private long TotalRAM => SystemInfo.systemMemorySize * 1000000L;
         private long TotalVRAM => SystemInfo.graphicsMemorySize * 1000000L;
@@ -43,6 +48,8 @@ namespace GraphicSetter
 
         public void Notify_ChangeState()
         {
+            if (!CurrentMods.Any()) return;
+
             if (shouldRecalc)
             {
                 shouldStop = !shouldStop;
@@ -80,6 +87,8 @@ namespace GraphicSetter
                     i++;
                     if (i % 3 == 0) yield return null;
                 }
+
+                LargestModSize = MemoryUsageByMod[mod] > LargestModSize ? MemoryUsageByMod[mod] : LargestModSize;
                 k++;
             }
             shouldRecalc = false;
@@ -92,6 +101,13 @@ namespace GraphicSetter
             if (!MemoryUsageByMod.ContainsKey(mod)) return 0;
             memUsage = MemoryUsageByMod[mod];
             return (float)((double)memUsage / (double)TotalBytes);
+        }
+        private Color GetColorFor(ModContentPack mod)
+        {
+            if (!MemoryUsageByMod.ContainsKey(mod)) return Color.green;
+            var memUsage = MemoryUsageByMod[mod];
+            var floatPct = (float)((double)memUsage / (double)LargestModSize);
+            return Color.Lerp(NiceBlue, Color.magenta, floatPct);
         }
 
         private string MemoryString(long memUsage, bool cap = false)
@@ -123,15 +139,17 @@ namespace GraphicSetter
 
         public void DrawMemoryData(Rect rect)
         {
-            Rect topHalf = rect.TopPart(0.7f);
-            Rect bottomHalf = rect.BottomPart(0.3f);
+            Rect topHalf = rect.TopPart(0.75f);
+            Rect bottomHalf = rect.BottomPart(0.25f);
             DrawModList(topHalf);
             WriteProcessingData(bottomHalf);
         }
 
         public void DrawModList(Rect rect)
         {
-            Widgets.DrawMenuSection(rect);
+            Widgets.DrawBoxSolid(rect, ListingBG);
+            Widgets.DrawBox(rect, 1, Texture2D.grayTexture);
+
             Rect newRect = rect.ContractedBy(5);
             GUI.BeginGroup(newRect);
             int y = 0;
@@ -144,12 +162,21 @@ namespace GraphicSetter
                 var pct = MemoryPctOf(mod.Key, out long memUsage);
                 var text = mod.Key.Name + " (" + MemoryString(memUsage) + ") " + pct.ToStringPercent();
                 var tipRect = new Rect(0, y, rect.width, 20);
-                WidgetRow row = new WidgetRow(0, y, UIDirection.RightThenDown);
-                row.FillableBar(newRect.width, 18, pct, text, StaticContent.blue, StaticContent.clear);
+                StaticTools.FillableBarLabeled(new Rect(0, y, newRect.width, 18), pct, text, GetColorFor(mod.Key), Color.clear, false);
+                //WidgetRow row = new WidgetRow(0, y, UIDirection.RightThenDown);
+                //row.FillableBar(newRect.width, 18, pct, text, GetColorFor(pct), StaticContent.clear);
                 Widgets.DrawHighlightIfMouseover(tipRect);
                 TooltipHandler.TipRegion(tipRect, text);
                 y += 20;
             }
+
+            if (!MemoryUsageByMod.Any())
+            {
+                string text = CurrentMods.Any() ? $"{CurrentMods.Count()} mods to process...": "No mods to process.";
+                float textHeight = Text.CalcHeight(text, rect.width);
+                Widgets.Label(new Rect(0, y, rect.width, textHeight), text);
+            }
+
             Widgets.EndScrollView();
             GUI.EndGroup();
         }
@@ -161,8 +188,8 @@ namespace GraphicSetter
             Rect buttonRect = new Rect(0, 5, rect.width * 0.2f, 22);
             Rect barRect = new Rect(buttonRect.xMax + 5, 5, rect.width - buttonRect.width - 5, 22);
             float curY = buttonRect.height;
-            string text = shouldRecalc ? (shouldStop ? "Continue" : "Stop" ) : "Recalc";
-            if (Widgets.ButtonText(buttonRect, text, true, false))
+            string text = shouldRecalc ? (shouldStop ? "Continue" : "Stop" ) : "Recalculate";
+            if (Widgets.ButtonText(buttonRect, text, true, false, CurrentMods.Any()))
             {
                 Notify_ChangeState();
             }
@@ -174,11 +201,13 @@ namespace GraphicSetter
 
             if (Calculating)
             {
-                Rect textRect = new Rect(0, curY + 5, rect.width, 18);
-                Widgets.Label(textRect, "Calculating... Please wait. (" + MemoryUsageByMod.Count + "/" + CurrentMods.Count() + ")");
+                string calcLabel = "Calculating... Please wait. (" + MemoryUsageByMod.Count + "/" + CurrentMods.Count() + ")";
+                var textSize = Text.CalcHeight(calcLabel, rect.width);
+                Rect textRect = new Rect(0, curY + 5, rect.width, textSize);
+                Widgets.Label(textRect, calcLabel);
                 curY = textRect.yMax;
             }
-            else if (GraphicSetter.settings.AnySettingsChanged())
+            /*else if (GraphicSetter.settings.AnySettingsChanged())
             {
                 string settingsChangedLabel = "Settings changed, recalculate to check the memory use!";
                 var textSize = Text.CalcHeight(settingsChangedLabel, rect.width);
@@ -186,13 +215,13 @@ namespace GraphicSetter
                 Widgets.Label(textRect, settingsChangedLabel);
                 curY = textRect.yMax;
             }
-
+            */
             if (Critical)
             {
                 Text.Font = GameFont.Small;
                 string warningLabel = "Warning:\n" + (MEMOVERFLOW ? "Your system cannot support these settings.\nCompression will be enabled on startup." : "Your system may struggle with these settings.");
-                var textSize = Text.CalcSize(warningLabel);
-                Rect warningLabelRect = new Rect(0, curY + 5, textSize.x, textSize.y);
+                var textSize = Text.CalcHeight(warningLabel, rect.width);
+                Rect warningLabelRect = new Rect(0, curY + 5, rect.width, textSize);
                 Widgets.Label(warningLabelRect, warningLabel);
                 Text.Font = default;
             }

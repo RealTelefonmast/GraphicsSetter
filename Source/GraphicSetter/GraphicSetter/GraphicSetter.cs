@@ -22,7 +22,7 @@ namespace GraphicSetter
 
         public GraphicSetter(ModContentPack content) : base(content)
         {
-            Log.Message("Graphics Setter - Loaded");
+            Log.Message("[1.3]Graphics Setter - Loaded");
             settings = GetSettings<GraphicsSettings>();
             //profiler = new ResourceProfiler();
             Harmony graphics = new Harmony("com.telefonmast.graphicssettings.rimworld.mod");
@@ -110,78 +110,130 @@ namespace GraphicSetter
         }
     }
 
-    public class SettingsGroup
+    public class SettingsGroup : IExposable
     {
-        public int anisoLevel = 2;
-        public FilterMode filterMode = FilterMode.Bilinear;
+        public int anisoLevel = 6;
+        public FilterMode filterMode = FilterMode.Trilinear;
         public bool useMipMap = true;
-        public float mipMapBias = 0f;
+        public float mipMapBias = -0.5f;
+
+        public void ExposeData()
+        {
+            Scribe_Values.Look(ref anisoLevel, "anisoLevel");
+            Scribe_Values.Look(ref useMipMap, "useMipMap");
+            Scribe_Values.Look(ref filterMode, "filterMode");
+            Scribe_Values.Look(ref mipMapBias, "mipMapBias");
+        }
+
+        public bool IsDefault()
+        {
+            if (anisoLevel != 6) return false;
+            if (filterMode != FilterMode.Trilinear) return false;
+            if (useMipMap != true) return false;
+            if (mipMapBias != -0.5f) return false;
+            return true;
+        }
+
+        public void Reset()
+        {
+            anisoLevel = 6;
+            filterMode = FilterMode.Trilinear;
+            useMipMap = true;
+            mipMapBias = -0.5f;
+        }
     }
 
     public class GraphicsSettings : ModSettings
     {
         private SettingsGroup lastSettings = new SettingsGroup();
-
         public bool CausedMemOverflow = false;
 
-        public int anisoLevel = 2;
-        public FilterMode filterMode = FilterMode.Bilinear;
-        public bool useMipMap = true;
-        public float mipMapBias = 0f;
+        internal enum GraphicsTabOption
+        {
+            Advanced,
+            Memory
+        }
 
+        //SETTINGS
+        public SettingsGroup mainSettings;
+
+        //FIXED RANGE DATA
         public readonly FloatRange anisoRange = new FloatRange(1, 9);
         public readonly FloatRange MipMapBiasRange = new FloatRange(-1f, 0.25f);
 
+        [Obsolete] //Players should have own control over the calculation
         private bool DoFirstTime = false;
+
+        private GraphicsTabOption SelTab { get; set; } = GraphicsTabOption.Advanced;
+
+        public GraphicsSettings()
+        {
+            mainSettings = new SettingsGroup();
+        }
 
         public void DoSettingsWindowContents(Rect inRect)
         {
-            if (!DoFirstTime)
+            //
+            GUI.BeginGroup(inRect);
+            Rect tabRect = new Rect(0, TabDrawer.TabHeight, inRect.width, 0);
+            Rect menuRect = new Rect(0, TabDrawer.TabHeight, inRect.width, inRect.height - TabDrawer.TabHeight);
+
+            Widgets.DrawMenuSection(menuRect);
+            //
+            var tabs = new List<TabRecord>();
+            tabs.Add(new TabRecord("Advanced", delegate { SelTab = GraphicsTabOption.Advanced;}, SelTab == GraphicsTabOption.Advanced));
+            tabs.Add(new TabRecord("Memory", delegate { SelTab = GraphicsTabOption.Memory; }, SelTab == GraphicsTabOption.Memory));
+            TabDrawer.DrawTabs(tabRect, tabs);
+
+            switch (SelTab)
             {
-                StaticContent.MemoryData.Notify_ChangeState();
-                DoFirstTime = true;
+                case GraphicsTabOption.Advanced:
+                    DrawAdvanced(menuRect.ContractedBy(15));
+                    break;
+                case GraphicsTabOption.Memory:
+                    DrawMemory(menuRect.ContractedBy(10));
+                    break;
             }
 
-            float curY = 50f;
-            CheckBox("(Recommended) Activate Mip-Mapping", ref curY, ref useMipMap);
+            GUI.EndGroup();
+        }
+
+        public bool AnySettingsChanged()
+        {
+            if (mainSettings.anisoLevel != lastSettings.anisoLevel)
+                return true;
+            if (mainSettings.filterMode != lastSettings.filterMode)
+                return true;
+            if (mainSettings.mipMapBias != lastSettings.mipMapBias)
+                return true;
+            if (mainSettings.useMipMap != lastSettings.useMipMap)
+                return true;
+            return false;
+        }
+
+        private void DrawAdvanced(Rect rect)
+        {
+            GUI.BeginGroup(rect);
+
+            float curY = 0f;
+            CheckBox("(Recommended) Activate Mip-Mapping", ref curY, ref mainSettings.useMipMap);
             Text.Anchor = TextAnchor.UpperCenter;
-            if (useMipMap)
-                mipMapBias = LabeledSlider("MipMap Bias", ref curY, MipMapBiasRange, mipMapBias, "Sharpest", "Blurriest", "This value changes how blurry textures can get depending on zoom, it is recommended to be equal or below 0.", 0.05f);
+            if (mainSettings.useMipMap)
+                mainSettings.mipMapBias = LabeledSlider("MipMap Bias", ref curY, MipMapBiasRange, mainSettings.mipMapBias, "Sharpest", "Blurriest", "This value changes how blurry textures can get depending on zoom, it is recommended to be equal or below 0.", 0.05f);
             curY += 10f;
-            anisoLevel = (int)LabeledSlider("Anisotropic Filter Level", ref curY, anisoRange, (float)anisoLevel, "", "", "Set the level of anisotropic filtering, higher levels may reduce performance on older graphics cards.", 1);
+            mainSettings.anisoLevel = (int)LabeledSlider("Anisotropic Filter Level", ref curY, anisoRange, (float)mainSettings.anisoLevel, "", "", "Set the level of anisotropic filtering, higher levels may reduce performance on older graphics cards.", 1);
             Text.Anchor = 0;
             curY += 10f;
-            SetFilter(curY);
+            SetFilter(ref curY);
+            curY += 10;
 
-            float x1 = (inRect.width - 120)/2;
-            Text.Anchor = TextAnchor.UpperCenter;
-            Rect presetLabel = new Rect(x1, 50, 120, 25);
-            Widgets.Label(presetLabel, "- PRESETS -");
-            Text.Anchor = 0;
-            Rect vanilla = new Rect(x1,presetLabel.yMax,120,35);
-            Rect better = new Rect(x1, vanilla.yMax + 5, 120, 35);
-            Rect ultra = new Rect(x1, better.yMax + 5, 120, 35);
-
-            if (Widgets.ButtonText(vanilla, "Vanilla"))
+            Rect resetButton = new Rect(0, curY, 120, 25);
+            if (!mainSettings.IsDefault())
             {
-                anisoLevel = 2;
-                filterMode = FilterMode.Bilinear;
-                useMipMap = true;
-                mipMapBias = 0;
-            }
-            if (Widgets.ButtonText(better, "Better"))
-            {
-                anisoLevel = 9;
-                filterMode = FilterMode.Trilinear;
-                useMipMap = true;
-                mipMapBias = -0.3f;
-            }
-            if (Widgets.ButtonText(ultra, "Redefined"))
-            {
-                anisoLevel = 9;
-                filterMode = FilterMode.Trilinear;
-                useMipMap = true;
-                mipMapBias = -1f;
+                if (Widgets.ButtonText(resetButton, "Reset"))
+                {
+                    mainSettings.Reset();
+                }
             }
 
             if (AnySettingsChanged())
@@ -190,11 +242,11 @@ namespace GraphicSetter
                 Text.Font = GameFont.Medium;
                 string text = "You will have to restart the game to apply changes!";
                 Vector2 size = Text.CalcSize(text);
-                float x2 = (inRect.width - size.x) / 2f;
-                float x3 = (inRect.width - 150) / 2f;
-                float y2 = inRect.yMax - 100;
+                float x2 = (rect.width - size.x) / 2f;
+                float x3 = (rect.width - 150) / 2f;
+                float y2 = rect.yMax - 150;
                 Widgets.Label(new Rect(x2, y2, size.x, size.y), text);
-                if (Widgets.ButtonText(new Rect(x3, inRect.yMax - 55, 150, 45), "Restart Game", true, true))
+                if (Widgets.ButtonText(new Rect(x3, y2 + size.y, 150, 45), "Restart Game", true, true))
                 {
                     this.Write();
                     GenCommandLine.Restart();
@@ -204,24 +256,12 @@ namespace GraphicSetter
                 GUI.color = Color.white;
             }
 
-            Rect rightMost = inRect.RightPartPixels(325);
-            var memDataRect = rightMost.ContractedBy(5);
-            GUI.BeginGroup(memDataRect);
-            StaticContent.MemoryData.DrawMemoryData(new Rect(0, 0, memDataRect.width, memDataRect.height));
             GUI.EndGroup();
         }
 
-        public bool AnySettingsChanged()
+        public void DrawMemory(Rect rect)
         {
-            if (anisoLevel != lastSettings.anisoLevel)
-                return true;
-            if (filterMode != lastSettings.filterMode)
-                return true;
-            if (mipMapBias != lastSettings.mipMapBias)
-                return true;
-            if (useMipMap != lastSettings.useMipMap)
-                return true;
-            return false;
+            StaticContent.MemoryData.DrawMemoryData(rect);
         }
 
         //TODO: Figure a way to use this
@@ -291,37 +331,37 @@ namespace GraphicSetter
             Text.Font = GameFont.Small;
         }
 
-        public void SetFilter(float curY)
+        public void SetFilter(ref float curY)
         {
             Widgets.Label(new Rect(0, curY, 200, 25f), "Texture Filtering: ");
             Rect button1 = new Rect(20, curY + 25f, 85, 22f);
             Rect button2 = new Rect(button1.x, button1.yMax, button1.width, button1.height);
-            if (Widgets.RadioButtonLabeled(button1,FilterMode.Bilinear.ToString(), filterMode == FilterMode.Bilinear))
+            if (Widgets.RadioButtonLabeled(button1,FilterMode.Bilinear.ToString(), mainSettings.filterMode == FilterMode.Bilinear))
             {
-                filterMode = FilterMode.Bilinear;
+                mainSettings.filterMode = FilterMode.Bilinear;
             }
-            if (Widgets.RadioButtonLabeled(button2, FilterMode.Trilinear.ToString(), filterMode == FilterMode.Trilinear))
+            if (Widgets.RadioButtonLabeled(button2, FilterMode.Trilinear.ToString(), mainSettings.filterMode == FilterMode.Trilinear))
             {
-                filterMode = FilterMode.Trilinear;
+                mainSettings.filterMode = FilterMode.Trilinear;
             }
+
+            curY = button2.yMax;
         }
 
         public override void ExposeData()
         {         
             base.ExposeData();
-            Scribe_Values.Look(ref anisoLevel, "anisoLevel");
-            Scribe_Values.Look(ref useMipMap, "useMipMap");
-            Scribe_Values.Look(ref filterMode, "filterMode");
-            Scribe_Values.Look(ref mipMapBias, "mipMapBias");
+            Scribe_Deep.Look(ref mainSettings, "settings");
             Scribe_Values.Look(ref CausedMemOverflow, "causedOverflow");
 
             if(Scribe.mode == LoadSaveMode.PostLoadInit)
             {
+                mainSettings ??= new SettingsGroup();
                 lastSettings = new SettingsGroup();
-                lastSettings.anisoLevel = anisoLevel;
-                lastSettings.useMipMap = useMipMap;
-                lastSettings.filterMode = filterMode;
-                lastSettings.mipMapBias = mipMapBias;
+                lastSettings.anisoLevel = mainSettings.anisoLevel;
+                lastSettings.useMipMap = mainSettings.useMipMap;
+                lastSettings.filterMode = mainSettings.filterMode;
+                lastSettings.mipMapBias = mainSettings.mipMapBias;
             }
         }
     }
