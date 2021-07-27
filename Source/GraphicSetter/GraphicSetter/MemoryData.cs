@@ -148,7 +148,9 @@ namespace GraphicSetter
         public void DrawModList(Rect rect)
         {
             Widgets.DrawBoxSolid(rect, ListingBG);
-            Widgets.DrawBox(rect, 1, Texture2D.grayTexture);
+            GUI.color = Color.gray;
+            Widgets.DrawBox(rect, 1);
+            GUI.color = Color.white;
 
             Rect newRect = rect.ContractedBy(5);
             GUI.BeginGroup(newRect);
