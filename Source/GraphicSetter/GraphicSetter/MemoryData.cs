@@ -11,7 +11,8 @@ namespace GraphicSetter
     public class MemoryData
     {
         //private static Dictionary<ModContentPack, long> RawMemoryUsageByMod = new Dictionary<ModContentPack, long>();
-        private static readonly Dictionary<ModContentPack, long> MemoryUsageByMod = new Dictionary<ModContentPack, long>();
+        private static readonly Dictionary<ModContentPack, long> MemoryUsageByMod = new();
+        private static readonly Dictionary<Pair<string, bool>, long> MemoryUsageByAtlas = new();
 
         private static Color ListingBG = new ColorInt(32, 36, 40).ToColor;
         private static Color NiceBlue = new ColorInt(38, 169, 224).ToColor;
@@ -21,12 +22,18 @@ namespace GraphicSetter
         private bool shouldStop = false;
 
         private long TotalBytes => MemoryUsageByMod.Sum(t => t.Value);
+        private long TotalBytesAtlas => MemoryUsageByAtlas.Sum(t => t.Value);
+
+        private long TotalUsage => TotalBytes + TotalBytesAtlas;
 
         private long LargestModSize { get; set; }
+        private long LargestAtlasSize { get; set; }
 
         private long TotalRAM => SystemInfo.systemMemorySize * 1000000L;
         private long TotalVRAM => SystemInfo.graphicsMemorySize * 1000000L;
-        private float TotalPctUsage => (float)(TotalBytes / (double)TotalVRAM);
+
+        private long MainMemory => TotalRAM;
+        private float TotalPctUsage => (float)(TotalUsage / (double)MainMemory);
 
         private bool Calculating => shouldRecalc;
 
@@ -44,7 +51,12 @@ namespace GraphicSetter
             MemoryUsageByMod.Clear();
         }
 
-        public Coroutine routine;
+        public Coroutine routine, routine2;
+
+        public void Notify_GetAtlasCache()
+        {
+            routine2 = StaticContent.CoroutineDriver.StartCoroutine(CalculateAtlasMemory());
+        }
 
         public void Notify_ChangeState()
         {
@@ -56,7 +68,29 @@ namespace GraphicSetter
                 return;
             }
             routine = StaticContent.CoroutineDriver.StartCoroutine(DoTheThing());
+            if (TotalBytesAtlas <= 0)
+            {
+                Notify_GetAtlasCache();
+            }
             shouldRecalc = true;
+        }
+
+        public IEnumerator CalculateAtlasMemory()
+        {
+            MemoryUsageByAtlas.Clear();
+
+            var allAtlases = GlobalTextureAtlasManager.staticTextureAtlases;
+            foreach (var atlas in allAtlases)
+            {
+                var texture = TextureAtlasHelper.MakeReadableTextureInstance(atlas.ColorTexture);
+                long size = texture.GetRawTextureData().Length;
+                new DisposableTexture(texture).Dispose();
+
+                var pair = new Pair<string, bool>(atlas.groupKey.@group.ToString(), atlas.groupKey.hasMask);
+                MemoryUsageByAtlas.Add(pair, size);
+                LargestAtlasSize = MemoryUsageByAtlas[pair] > LargestAtlasSize ? MemoryUsageByAtlas[pair] : LargestAtlasSize;
+                yield return null;
+            }
         }
 
         public IEnumerator DoTheThing()
@@ -92,7 +126,23 @@ namespace GraphicSetter
                 k++;
             }
             shouldRecalc = false;
-            GraphicSetter.settings.CausedMemOverflow = MEMOVERFLOW;
+            GraphicSetter.Settings.CausedMemOverflow = MEMOVERFLOW;
+        }
+
+        private float MemoryPctOf(Pair<string, bool> pair, out long memUsage)
+        {
+            memUsage = 0;
+            if (!MemoryUsageByAtlas.ContainsKey(pair)) return 0;
+            memUsage = MemoryUsageByAtlas[pair];
+            return (float)((double)memUsage / (double)TotalBytesAtlas);
+        }
+
+        private Color GetColorFor(Pair<string, bool> pair)
+        {
+            if (!MemoryUsageByAtlas.ContainsKey(pair)) return Color.green;
+            var memUsage = MemoryUsageByAtlas[pair];
+            var floatPct = (float)((double)memUsage / (double)LargestAtlasSize);
+            return Color.Lerp(NiceBlue, Color.magenta, floatPct);
         }
 
         private float MemoryPctOf(ModContentPack mod, out long memUsage)
@@ -102,6 +152,7 @@ namespace GraphicSetter
             memUsage = MemoryUsageByMod[mod];
             return (float)((double)memUsage / (double)TotalBytes);
         }
+
         private Color GetColorFor(ModContentPack mod)
         {
             if (!MemoryUsageByMod.ContainsKey(mod)) return Color.green;
@@ -113,9 +164,9 @@ namespace GraphicSetter
         private string MemoryString(long memUsage, bool cap = false)
         {
             //return memUsage + " bytes";
-            if (cap && memUsage > TotalVRAM)
+            if (cap && memUsage > MainMemory)
             {
-                return ">" + MemoryString(TotalVRAM);
+                return ">" + MemoryString(MainMemory);
             }
             if (memUsage < 1000)
             {
@@ -137,6 +188,11 @@ namespace GraphicSetter
         //Render Data
         private Vector2 scrollview = new Vector2(0,0);
 
+        public void DrawPawnAtlasMemory(Rect rect)
+        {
+
+        }
+
         public void DrawMemoryData(Rect rect)
         {
             Rect topHalf = rect.TopPart(0.75f);
@@ -147,39 +203,73 @@ namespace GraphicSetter
 
         public void DrawModList(Rect rect)
         {
+            rect = new Rect(rect.x, rect.y + 20, rect.width, rect.height - 20);
+            Rect newRect = rect.ContractedBy(5);
+            Rect leftSide = newRect.LeftHalf().ContractedBy(1);
+            Rect rightSide = newRect.RightHalf().ContractedBy(1);
+
             Widgets.DrawBoxSolid(rect, ListingBG);
             GUI.color = Color.gray;
             Widgets.DrawBox(rect, 1);
             GUI.color = Color.white;
 
-            Rect newRect = rect.ContractedBy(5);
-            GUI.BeginGroup(newRect);
-            int y = 0;
-            Rect viewRect = new Rect(0, 0, newRect.width, CurrentMods.Count() * 20);
-            Widgets.BeginScrollView(new Rect(0, 0, newRect.width, newRect.height), ref scrollview, viewRect, false);
-            var list = MemoryUsageByMod.ToList();
-            list.Sort((p1, p2) => p2.Value.CompareTo(p1.Value));
-            foreach (var mod in list)
-            {
-                var pct = MemoryPctOf(mod.Key, out long memUsage);
-                var text = mod.Key.Name + " (" + MemoryString(memUsage) + ") " + pct.ToStringPercent();
-                var tipRect = new Rect(0, y, rect.width, 20);
-                StaticTools.FillableBarLabeled(new Rect(0, y, newRect.width, 18), pct, text, GetColorFor(mod.Key), Color.clear, false);
-                //WidgetRow row = new WidgetRow(0, y, UIDirection.RightThenDown);
-                //row.FillableBar(newRect.width, 18, pct, text, GetColorFor(pct), StaticContent.clear);
-                Widgets.DrawHighlightIfMouseover(tipRect);
-                TooltipHandler.TipRegion(tipRect, text);
-                y += 20;
-            }
+            Widgets.DrawBoxSolid(new Rect(leftSide.xMax, rect.y, 2, rect.height), Color.gray);
 
-            if (!MemoryUsageByMod.Any())
+            Widgets.Label(new Rect(leftSide.x, rect.y - 20, leftSide.width, 20), "All Texture Content");
+            GUI.BeginGroup(leftSide);
             {
-                string text = CurrentMods.Any() ? $"{CurrentMods.Count()} mods to process...": "No mods to process.";
-                float textHeight = Text.CalcHeight(text, rect.width);
-                Widgets.Label(new Rect(0, y, rect.width, textHeight), text);
-            }
+                int y = 0;
+                Rect viewRect = new Rect(0, 0, leftSide.width, CurrentMods.Count() * 20);
+                Widgets.BeginScrollView(new Rect(0, 0, leftSide.width, leftSide.height), ref scrollview, viewRect, false);
+                var list = MemoryUsageByMod.ToList();
+                list.Sort((p1, p2) => p2.Value.CompareTo(p1.Value));
+                foreach (var mod in list)
+                {
+                    var pct = MemoryPctOf(mod.Key, out long memUsage);
+                    var text = mod.Key.Name + " (" + MemoryString(memUsage) + ") " + pct.ToStringPercent();
+                    var tipRect = new Rect(0, y, rect.width, 20);
+                    StaticTools.FillableBarLabeled(new Rect(0, y, leftSide.width, 18), pct, text, GetColorFor(mod.Key),
+                        Color.clear, false);
+                    //WidgetRow row = new WidgetRow(0, y, UIDirection.RightThenDown);
+                    //row.FillableBar(newRect.width, 18, pct, text, GetColorFor(pct), StaticContent.clear);
+                    Widgets.DrawHighlightIfMouseover(tipRect);
+                    TooltipHandler.TipRegion(tipRect, text);
+                    y += 20;
+                }
 
-            Widgets.EndScrollView();
+                if (!MemoryUsageByMod.Any())
+                {
+                    string text = CurrentMods.Any()
+                        ? $"{CurrentMods.Count()} mods to process..."
+                        : "No mods to process.";
+                    float textHeight = Text.CalcHeight(text, rect.width);
+                    Widgets.Label(new Rect(0, y, rect.width, textHeight), text);
+                }
+                Widgets.EndScrollView();
+            }
+            GUI.EndGroup();
+
+            //ATLAS
+            Widgets.Label(new Rect(rightSide.x, rect.y - 20, rightSide.width, 20), "Cached Atlas Textures");
+            GUI.BeginGroup(rightSide);
+            {
+                int y = 0;
+                Rect viewRect = new Rect(0, 0, rightSide.width, MemoryUsageByAtlas.Count() * 20);
+                Widgets.BeginScrollView(new Rect(0, 0, rightSide.width, rightSide.height), ref scrollview, viewRect, false);
+                var list = MemoryUsageByAtlas.ToList();
+                list.Sort((p1, p2) => p2.Value.CompareTo(p1.Value));
+                foreach (var atlas in list)
+                {
+                    var pct = MemoryPctOf(atlas.Key, out long memUsage);
+                    var text = $"{atlas.Key.First}{(atlas.Key.Second ? "[Masks]" : "")}: ({MemoryString(memUsage)}) {pct.ToStringPercent()}";
+                    var tipRect = new Rect(0, y, rect.width, 20);
+                    StaticTools.FillableBarLabeled(new Rect(0, y, rightSide.width, 18), pct, text, GetColorFor(atlas.Key), Color.clear, false);
+                    Widgets.DrawHighlightIfMouseover(tipRect);
+                    TooltipHandler.TipRegion(tipRect, text);
+                    y += 20;
+                }
+                Widgets.EndScrollView();
+            }
             GUI.EndGroup();
         }
 
@@ -187,17 +277,18 @@ namespace GraphicSetter
         {
             GUI.BeginGroup(rect);
 
-            Rect buttonRect = new Rect(0, 5, rect.width * 0.2f, 22);
-            Rect barRect = new Rect(buttonRect.xMax + 5, 5, rect.width - buttonRect.width - 5, 22);
-            float curY = buttonRect.height;
+            Rect buttons = new Rect(0, 5, rect.width * 0.20f, 22);
+            Rect barRect = new Rect(buttons.xMax + 5, 5, rect.width - buttons.width - 5, 22);
+            float curY = buttons.height;
             string text = shouldRecalc ? (shouldStop ? "Continue" : "Stop" ) : "Recalculate";
-            if (Widgets.ButtonText(buttonRect, text, true, false, CurrentMods.Any()))
+            if (Widgets.ButtonText(buttons, text, true, false, CurrentMods.Any()))
             {
                 Notify_ChangeState();
             }
+
             Widgets.FillableBar(barRect, TotalPctUsage, StaticContent.blue, Texture2D.blackTexture, true);
             Text.Anchor = TextAnchor.MiddleCenter;
-            string label = MEMOVERFLOW ? "Not Enough VRAM" : MemoryString(TotalBytes) + "/" + MemoryString(TotalVRAM);
+            string label = MEMOVERFLOW ? "Not Enough VRAM" : MemoryString(TotalUsage) + "/" + MemoryString(MainMemory);
             Widgets.Label(barRect, label);
             Text.Anchor = default;
 
@@ -225,7 +316,7 @@ namespace GraphicSetter
                 var textSize = Text.CalcHeight(warningLabel, rect.width);
                 Rect warningLabelRect = new Rect(0, curY + 5, rect.width, textSize);
                 Widgets.Label(warningLabelRect, warningLabel);
-                Text.Font = default;
+                Text.Font = GameFont.Small;
             }
             GUI.EndGroup();
         }
