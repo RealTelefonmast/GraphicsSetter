@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using HarmonyLib;
+using RimWorld;
 using UnityEngine;
 using Verse;
 
@@ -27,7 +28,7 @@ namespace GraphicSetter
         public int mainTexResScale = 1;
 
         //FIXED RANGE DATA
-        public static readonly FloatRange PawnTexScaleRange = new FloatRange(1, 6);
+        public static readonly FloatRange PawnTexScaleRange = new FloatRange(1, 4);
         public static readonly IntRange MainTexScaleRange = new IntRange(1, 2);
 
         public static readonly FloatRange AnisoRange = new FloatRange(1, 9);
@@ -37,10 +38,19 @@ namespace GraphicSetter
         {
             Scribe_Values.Look(ref anisoLevel, "anisoLevel");
             Scribe_Values.Look(ref useMipMap, "useMipMap");
+            Scribe_Values.Look(ref useAntiA, "useAntiA");
+            Scribe_Values.Look(ref useCustomPawnAtlas, "useCustomPawnAtlas");
             Scribe_Values.Look(ref filterMode, "filterMode");
             Scribe_Values.Look(ref mipMapBias, "mipMapBias");
-            Scribe_Values.Look(ref useCustomPawnAtlas, "useCustomPawnAtlas");
             Scribe_Values.Look(ref pawnTexResScale, "pawnTexResScale");
+
+            if (Scribe.mode == LoadSaveMode.PostLoadInit)
+            {
+                if (pawnTexResScale > 4)
+                {
+                    pawnTexResScale = 4;
+                }
+            }
         }
 
         public bool IsDefault()
@@ -166,7 +176,6 @@ namespace GraphicSetter
             Listing_Standard listing2 = new Listing_Standard();
             listing2.Begin(rightRect);
             {
-
                 listing2.Label("Pawn Render Settings");
                 listing2.GapLine();
 
@@ -174,16 +183,22 @@ namespace GraphicSetter
 
                 if (mainSettings.useCustomPawnAtlas)
                 {
-                    mainSettings.pawnTexResScale = (int) listing2.LabeledSlider("Pawn Atlas Scale",
-                        SettingsGroup.PawnTexScaleRange, mainSettings.pawnTexResScale, roundTo: 1,
-                        tooltip: pawnAtlasToolTip);
-                }
+                    mainSettings.pawnTexResScale = (int) listing2.LabeledSlider("Pawn Atlas Scale", SettingsGroup.PawnTexScaleRange, mainSettings.pawnTexResScale, roundTo: 1, tooltip: pawnAtlasToolTip);
 
-                if (listing2.ButtonTextEnabled("Apply Atlas", Current.ProgramState == ProgramState.Playing, "Can only apply during running game. The settings are loaded when a new pawn spawns by default."))
-                {
-                    foreach (PawnTextureAtlas pawnTextureAtlas in GlobalTextureAtlasManager.pawnTextureAtlases)
+                    listing2.Gap();
+                    if (listing2.ButtonTextEnabled("Apply Atlas", Current.ProgramState == ProgramState.Playing, "Can only apply during running game."))
                     {
-                        pawnTextureAtlas.Destroy();
+                        foreach (PawnTextureAtlas pawnTextureAtlas in GlobalTextureAtlasManager.pawnTextureAtlases)
+                        {
+                            pawnTextureAtlas.Destroy();
+                        }
+                    }
+
+                    if (mainSettings.pawnTexResScale > 2)
+                    {
+                        GUI.color = Color.red;
+                        listing2.Label("Warning: Higher texture scaling uses more VRAM!");
+                        GUI.color = Color.white;
                     }
                 }
                 //listing2.RenderInListing(listing.curY, StaticContent.MemoryData.DrawPawnAtlasMemory);

@@ -18,6 +18,9 @@
 			<downloadUrl>https://github.com/pardeike/HarmonyRimWorld/releases/latest</downloadUrl>
 		</li>
 	</modDependencies>
+	<incompatibleWith>
+		<li>bs.hpr</li>
+	</incompatibleWith>
 	<description>Ever wonder where RimWorld hid it's graphics settings?
    Apparently there are none, so here you go, have some.
    

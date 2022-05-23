@@ -43,6 +43,17 @@ namespace GraphicSetter
 
         public bool MEMOVERFLOW => TotalPctUsage > 1f;
 
+        public static Texture2D ToTexture2D(RenderTexture rTex)
+        {
+            RenderTexture.active = rTex;
+            var settings = GraphicsSettings.mainSettings;
+            var size = 2048 * settings.pawnTexResScale;
+            Texture2D dest = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            dest.ReadPixels(new Rect(0, 0, size, size), 0, 0);
+            dest.Apply(false, false);
+            RenderTexture.active = null;
+            return dest;
+        }
 
         public void Notify_SettingsChanged()
         {
@@ -161,12 +172,12 @@ namespace GraphicSetter
             return Color.Lerp(NiceBlue, Color.magenta, floatPct);
         }
 
-        private string MemoryString(long memUsage, bool cap = false)
+        private static string MemoryString(long memUsage, long maxMem, bool cap = false)
         {
             //return memUsage + " bytes";
-            if (cap && memUsage > MainMemory)
+            if (cap && memUsage > maxMem)
             {
-                return ">" + MemoryString(MainMemory);
+                return ">" + MemoryString(maxMem, maxMem);
             }
             if (memUsage < 1000)
             {
@@ -226,7 +237,7 @@ namespace GraphicSetter
                 foreach (var mod in list)
                 {
                     var pct = MemoryPctOf(mod.Key, out long memUsage);
-                    var text = mod.Key.Name + " (" + MemoryString(memUsage) + ") " + pct.ToStringPercent();
+                    var text = mod.Key.Name + " (" + MemoryString(memUsage, MainMemory) + ") " + pct.ToStringPercent();
                     var tipRect = new Rect(0, y, rect.width, 20);
                     StaticTools.FillableBarLabeled(new Rect(0, y, leftSide.width, 18), pct, text, GetColorFor(mod.Key),
                         Color.clear, false);
@@ -261,7 +272,7 @@ namespace GraphicSetter
                 foreach (var atlas in list)
                 {
                     var pct = MemoryPctOf(atlas.Key, out long memUsage);
-                    var text = $"{atlas.Key.First}{(atlas.Key.Second ? "[Masks]" : "")}: ({MemoryString(memUsage)}) {pct.ToStringPercent()}";
+                    var text = $"{atlas.Key.First}{(atlas.Key.Second ? "[Masks]" : "")}: ({MemoryString(memUsage, MainMemory)}) {pct.ToStringPercent()}";
                     var tipRect = new Rect(0, y, rect.width, 20);
                     StaticTools.FillableBarLabeled(new Rect(0, y, rightSide.width, 18), pct, text, GetColorFor(atlas.Key), Color.clear, false);
                     Widgets.DrawHighlightIfMouseover(tipRect);
@@ -288,7 +299,7 @@ namespace GraphicSetter
 
             Widgets.FillableBar(barRect, TotalPctUsage, StaticContent.blue, Texture2D.blackTexture, true);
             Text.Anchor = TextAnchor.MiddleCenter;
-            string label = MEMOVERFLOW ? "Not Enough VRAM" : MemoryString(TotalUsage) + "/" + MemoryString(MainMemory);
+            string label = MEMOVERFLOW ? "Not Enough VRAM" : MemoryString(TotalUsage, MainMemory) + "/" + MemoryString(MainMemory, MainMemory);
             Widgets.Label(barRect, label);
             Text.Anchor = default;
 

@@ -28,13 +28,13 @@ namespace GraphicSetter
         public static RenderTexture CreatePawnRenderTex()
         {
             var settings = GraphicsSettings.mainSettings;
-            RenderTexture tex = new(baseTextureRes * settings.pawnTexResScale,
-                baseTextureRes * settings.pawnTexResScale, 24, RenderTextureFormat.ARGB32);
+            RenderTexture tex = new(baseTextureRes * settings.pawnTexResScale, baseTextureRes * settings.pawnTexResScale, 24, RenderTextureFormat.ARGB32);
+            /*
             if (settings.useAntiA)
             {
                 tex.antiAliasing = (int) settings.antiALevel;
             }
-
+            */
             if (settings.useMipMap)
             {
                 tex.useMipMap = true;
