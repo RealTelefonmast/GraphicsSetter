@@ -57,9 +57,9 @@ namespace GraphicSetter
                 {
                     texture2D = DDSLoader.LoadDDS(ddsExtensionPath);
                     if(!DDSLoader.error.NullOrEmpty())
-                        Log.Warning("DDS Error: " + DDSLoader.error);
+                        Log.Warning($"DDS ERROR at '{file.FullPath}': {DDSLoader.error}");
                     if(texture2D == null)
-                        Log.Warning("Couldn't load .dds from " + file.Name + " loading as png instead.");
+                        Log.Warning($"Couldn't load .dds from {file.Name} loading as png instead.");
                 }
                 if (texture2D == null && file.Exists)
                 {

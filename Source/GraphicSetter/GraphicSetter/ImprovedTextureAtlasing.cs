@@ -23,12 +23,12 @@ namespace GraphicSetter
 
     public static class ImprovedTextureAtlasing
     {
-        private static int baseTextureRes = 2048;
+        internal static int _BaseRes = 2048;
 
-        public static RenderTexture CreatePawnRenderTex()
+        public static RenderTexture CreatePawnRenderTex(int referenceWidth = 2048, int referenceHeight = 2048)
         {
             var settings = GraphicsSettings.mainSettings;
-            RenderTexture tex = new(baseTextureRes * settings.pawnTexResScale, baseTextureRes * settings.pawnTexResScale, 24, RenderTextureFormat.ARGB32);
+            RenderTexture tex = new(referenceWidth * settings.pawnTexResScale, referenceHeight * settings.pawnTexResScale, 24, RenderTextureFormat.ARGB32);
             /*
             if (settings.useAntiA)
             {

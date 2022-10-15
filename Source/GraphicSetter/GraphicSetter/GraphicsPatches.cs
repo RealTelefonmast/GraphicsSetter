@@ -16,8 +16,7 @@ namespace GraphicSetter
 {
     public static class GraphicsPatches
     {
-
-        [HarmonyPatch(typeof(PawnTextureAtlas), MethodType.Constructor)]
+        //Manual Patch
         public static class PawnTextureAtlasCtorPatch
         {
             private static MethodInfo injection = AccessTools.Method(typeof(PawnTextureAtlasCtorPatch), nameof(CustomRenderTexture));
@@ -29,8 +28,6 @@ namespace GraphicSetter
                 bool foundObjectInit = false;
                 bool initInjection = true;
                 bool ignoringUntilOldRenderTex = true;
-
-                int i = 0;
 
                 foreach (var instruction in instructions)
                 {
@@ -73,6 +70,51 @@ namespace GraphicSetter
             }
         }
 
+        /*
+        public static class PawnTextureAtlasCtorPatch
+        {
+            private static MethodInfo injection = AccessTools.Method(typeof(PawnTextureAtlasCtorPatch), nameof(CustomRenderTexture));
+            private static ConstructorInfo comparision = AccessTools.Constructor(typeof(Object));
+            private static FieldInfo textureInfo = AccessTools.Field(typeof(PawnTextureAtlas), nameof(PawnTextureAtlas.texture));
+
+            public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+            {
+                bool foundObjectInit = false;
+                bool initInjection = true;
+
+                foreach (var instruction in instructions)
+                {
+                    if (foundObjectInit)
+                    {
+                        if (initInjection && (instruction.opcode == OpCodes.Stfld && instruction.operand is FieldInfo fInfo && fInfo == textureInfo))
+                        {
+                            yield return new CodeInstruction(OpCodes.Callvirt, injection);
+                            yield return new CodeInstruction(OpCodes.Stfld, textureInfo);
+                            initInjection = false;
+                            continue;
+                        }
+                    }
+
+                    if (instruction?.operand is ConstructorInfo infoTwo && infoTwo == comparision)
+                    {
+                        foundObjectInit = true;
+                    }
+                    yield return instruction;
+                }
+            }
+
+            private static RenderTexture CustomRenderTexture(RenderTexture rTex)
+            {
+                if (GraphicsSettings.mainSettings.useCustomPawnAtlas)
+                {
+                    return ImprovedTextureAtlasing.CreatePawnRenderTex(rTex.width, rTex.height);
+                }
+                return new RenderTexture(rTex.width, rTex.height, 24, RenderTextureFormat.ARGB32, 0);
+            }
+        }
+        */
+
+        //Automatic Patches
         [HarmonyPatch(typeof(ModContentLoader<Texture2D>))]
         [HarmonyPatch("LoadTexture")]
         public static class LoadPNGPatch
@@ -147,8 +189,6 @@ namespace GraphicSetter
                 return false;
             }
         }
-        
-
 
 
         /*

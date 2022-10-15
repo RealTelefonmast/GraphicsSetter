@@ -1,8 +1,9 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Configuration>
   <Excluded>
-    <exclude>C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\GraphicsSetter\.git</exclude>
-    <exclude>C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\GraphicsSetter\AssemblyDump</exclude>
-    <exclude>C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\GraphicsSetter\Source</exclude>
+    <exclude>.git</exclude>
+    <exclude>1.1\Assemblies\GraphicSetter.pdb</exclude>
+    <exclude>AssemblyDump</exclude>
+    <exclude>Source</exclude>
   </Excluded>
 </Configuration>

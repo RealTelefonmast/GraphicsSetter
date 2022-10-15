@@ -32,6 +32,7 @@ namespace GraphicSetter
             Settings = GetSettings<GraphicsSettings>();
             //profiler = new ResourceProfiler();
             Harmony graphics = new Harmony("com.telefonmast.graphicssettings.rimworld.mod");
+            graphics.Patch(AccessTools.Constructor(typeof(PawnTextureAtlas)), transpiler: new(typeof(GraphicsPatches.PawnTextureAtlasCtorPatch).GetMethod(nameof(GraphicsPatches.PawnTextureAtlasCtorPatch.Transpiler)), Priority.First));
             graphics.PatchAll();
         }
 
