@@ -140,7 +140,7 @@ namespace GraphicSetter
                 var idx = optList.FirstIndexOf(opt => opt.label == label);
                 if (idx > 0 && idx < optList.Count) optList.Insert(idx + 1, new ListableOption("Graphics Settings", delegate
                 {
-                    var dialog = new Dialog_ModSettings();
+                    var dialog = new Dialog_ModSettings(GraphicSetter.ModRef);
                     var me = LoadedModManager.GetMod<GraphicSetter>();
                     StaticContent.selModByRef(dialog) = me;
                     Find.WindowStack.Add(dialog);

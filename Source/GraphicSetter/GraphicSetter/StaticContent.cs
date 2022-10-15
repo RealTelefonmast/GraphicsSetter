@@ -10,7 +10,7 @@ namespace GraphicSetter
     public static class StaticContent
     {
         //Inspired by Brrainz' patches
-        internal static AccessTools.FieldRef<Dialog_ModSettings, Mod> selModByRef = FieldRefAccess<Dialog_ModSettings, Mod>("selMod");
+        internal static AccessTools.FieldRef<Dialog_ModSettings, Mod> selModByRef = FieldRefAccess<Dialog_ModSettings, Mod>("mod");
         private static GameObject RoutineHolder;
         internal static GraphicsDriver CoroutineDriver;
         internal static MemoryData MemoryData;

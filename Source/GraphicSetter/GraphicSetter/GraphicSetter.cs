@@ -20,6 +20,8 @@ namespace GraphicSetter
     {
         private static GraphicsSettings settings;
 
+        public static GraphicSetter ModRef { get; private set; }
+        
         public static GraphicsSettings Settings
         {
             get => settings;
@@ -28,6 +30,7 @@ namespace GraphicSetter
 
         public GraphicSetter(ModContentPack content) : base(content)
         {
+            ModRef = this;
             Log.Message("[1.3]Graphics Setter - Loaded");
             Settings = GetSettings<GraphicsSettings>();
             //profiler = new ResourceProfiler();
