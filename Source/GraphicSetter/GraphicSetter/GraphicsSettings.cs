@@ -26,7 +26,7 @@ namespace GraphicSetter
         public static readonly IntRange MainTexScaleRange = new IntRange(1, 2);
 
         public static readonly FloatRange AnisoRange = new FloatRange(1, 9);
-        public static readonly FloatRange MipMapBiasRange = new FloatRange(-1f, 0.75f);
+        public static readonly FloatRange MipMapBiasRange = new FloatRange(0.75f, -1f);
 
         public void ExposeData()
         {
@@ -153,8 +153,7 @@ namespace GraphicSetter
                 listing.CheckboxLabeled("GS_MipMapping".Translate(), ref mainSettings.useMipMap);
                 if (mainSettings.useMipMap)
                 {
-                    mainSettings.mipMapBias = listing.LabeledSlider("GS_MipMapBias".Translate(), SettingsGroup.MipMapBiasRange,
-                        mainSettings.mipMapBias, "GS_MipMapSharp".Translate(), "GS_MipMapBlurry".Translate(), "GS_MipMapToolTip".Translate(), 0.05f);
+                    mainSettings.mipMapBias = listing.LabeledSlider("GS_MipMapBias".Translate(), SettingsGroup.MipMapBiasRange, mainSettings.mipMapBias, "GS_MipMapBlurry".Translate(),"GS_MipMapSharp".Translate(), "GS_MipMapToolTip".Translate(), 0.05f);
                 }
 
                 mainSettings.anisoLevel = (int) listing.LabeledSlider("GS_AnisoLevel".Translate(), SettingsGroup.AnisoRange,
