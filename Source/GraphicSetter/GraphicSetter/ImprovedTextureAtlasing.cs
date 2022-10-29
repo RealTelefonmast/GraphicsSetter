@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using UnityEngine;
 using Verse;
 
@@ -16,16 +12,13 @@ namespace GraphicSetter
         EightX = 8,
     }
 
-    public enum TextureDepth
-    {
-
-    }
-
+    [Obsolete]
     public static class ImprovedTextureAtlasing
     {
-        internal static int _BaseRes = 2048;
+        private const int BaseRes = PawnTextureAtlas.AtlasSize;
 
-        public static RenderTexture CreatePawnRenderTex(int referenceWidth = 2048, int referenceHeight = 2048)
+        [Obsolete]
+        public static RenderTexture CreatePawnRenderTex(int referenceWidth = BaseRes, int referenceHeight = BaseRes)
         {
             var settings = GraphicsSettings.mainSettings;
             RenderTexture tex = new(referenceWidth * settings.pawnTexResScale, referenceHeight * settings.pawnTexResScale, 24, RenderTextureFormat.ARGB32);
@@ -46,6 +39,7 @@ namespace GraphicSetter
             return tex;
         }
 
+        [Obsolete]
         public static Texture2D MakeReadableTextureInstance_Fixed(Texture2D source)
         {
             RenderTexture temporary = RenderTexture.GetTemporary(source.width, source.height, 0, RenderTextureFormat.Default, RenderTextureReadWrite.Linear);
@@ -54,7 +48,7 @@ namespace GraphicSetter
             RenderTexture active = RenderTexture.active;
             RenderTexture.active = temporary;
             Texture2D texture2D = new Texture2D(source.width, source.height);
-            texture2D.ReadPixels(new Rect(0f, 0f, (float) temporary.width, (float) temporary.height), 0, 0);
+            texture2D.ReadPixels(new Rect(0f, 0f, temporary.width, temporary.height), 0, 0);
 
             //Apply Settings
             var settings = GraphicsSettings.mainSettings;

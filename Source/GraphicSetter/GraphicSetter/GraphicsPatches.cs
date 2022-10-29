@@ -1,10 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using System.Text;
-using System.Threading.Tasks;
 using HarmonyLib;
 using RimWorld;
 using RimWorld.IO;
@@ -17,11 +14,12 @@ namespace GraphicSetter
     public static class GraphicsPatches
     {
         //Manual Patch
+        /*
         public static class PawnTextureAtlasCtorPatch
         {
-            private static MethodInfo injection = AccessTools.Method(typeof(PawnTextureAtlasCtorPatch), nameof(CustomRenderTexture));
-            private static ConstructorInfo comparision = AccessTools.Constructor(typeof(Object));
-            private static FieldInfo textureInfo = AccessTools.Field(typeof(PawnTextureAtlas), nameof(PawnTextureAtlas.texture));
+            private static readonly MethodInfo Injection = AccessTools.Method(typeof(PawnTextureAtlasCtorPatch), nameof(CustomRenderTexture));
+            private static readonly ConstructorInfo Comparision = AccessTools.Constructor(typeof(Object));
+            private static readonly FieldInfo TextureInfo = AccessTools.Field(typeof(PawnTextureAtlas), nameof(PawnTextureAtlas.texture));
 
             public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
             {
@@ -36,14 +34,14 @@ namespace GraphicSetter
                         if (initInjection)
                         {
                             yield return new CodeInstruction(OpCodes.Ldarg_0);
-                            yield return new CodeInstruction(OpCodes.Call, injection);
-                            yield return new CodeInstruction(OpCodes.Stfld, textureInfo);
+                            yield return new CodeInstruction(OpCodes.Call, Injection);
+                            yield return new CodeInstruction(OpCodes.Stfld, TextureInfo);
                             initInjection = false;
                         }
 
                         if (ignoringUntilOldRenderTex)
                         {
-                            if (instruction.opcode == OpCodes.Stfld && instruction.operand is FieldInfo fInfo && fInfo == textureInfo)
+                            if (instruction.opcode == OpCodes.Stfld && instruction.operand is FieldInfo fInfo && fInfo == TextureInfo)
                             {
                                 ignoringUntilOldRenderTex = false;
                             }
@@ -51,7 +49,7 @@ namespace GraphicSetter
                         }
                     }
 
-                    if (instruction?.operand is ConstructorInfo infoTwo && infoTwo == comparision)
+                    if (instruction?.operand is ConstructorInfo infoTwo && infoTwo == Comparision)
                     {
                         foundObjectInit = true;
                     }
@@ -69,6 +67,7 @@ namespace GraphicSetter
                 return new RenderTexture(2048, 2048, 24, RenderTextureFormat.ARGB32, 0);
             }
         }
+        */
 
         /*
         public static class PawnTextureAtlasCtorPatch

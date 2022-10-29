@@ -226,7 +226,7 @@ namespace GraphicSetter
 
             Widgets.DrawBoxSolid(new Rect(leftSide.xMax, rect.y, 2, rect.height), Color.gray);
 
-            Widgets.Label(new Rect(leftSide.x, rect.y - 20, leftSide.width, 20), "All Texture Content");
+            Widgets.Label(new Rect(leftSide.x, rect.y - 20, leftSide.width, 20), "GS_AllTextureMemory".Translate());
             GUI.BeginGroup(leftSide);
             {
                 int y = 0;
@@ -251,8 +251,8 @@ namespace GraphicSetter
                 if (!MemoryUsageByMod.Any())
                 {
                     string text = CurrentMods.Any()
-                        ? $"{CurrentMods.Count()} mods to process..."
-                        : "No mods to process.";
+                        ? "GS_ModsToProcessLabel".Translate(CurrentMods.Count())
+                        : "GS_NoModsToProcess".Translate();
                     float textHeight = Text.CalcHeight(text, rect.width);
                     Widgets.Label(new Rect(0, y, rect.width, textHeight), text);
                 }
@@ -261,7 +261,7 @@ namespace GraphicSetter
             GUI.EndGroup();
 
             //ATLAS
-            Widgets.Label(new Rect(rightSide.x, rect.y - 20, rightSide.width, 20), "Cached Atlas Textures");
+            Widgets.Label(new Rect(rightSide.x, rect.y - 20, rightSide.width, 20), "GS_CachedAtlasses".Translate());
             GUI.BeginGroup(rightSide);
             {
                 int y = 0;
@@ -291,7 +291,7 @@ namespace GraphicSetter
             Rect buttons = new Rect(0, 5, rect.width * 0.20f, 22);
             Rect barRect = new Rect(buttons.xMax + 5, 5, rect.width - buttons.width - 5, 22);
             float curY = buttons.height;
-            string text = shouldRecalc ? (shouldStop ? "Continue" : "Stop" ) : "Recalculate";
+            string text = shouldRecalc ? (shouldStop ? "GS_CacheContinue".Translate() : "GS_CacheStop".Translate() ) : "GS_CacheRecalc".Translate();
             if (Widgets.ButtonText(buttons, text, true, false, CurrentMods.Any()))
             {
                 Notify_ChangeState();
@@ -299,13 +299,13 @@ namespace GraphicSetter
 
             Widgets.FillableBar(barRect, TotalPctUsage, StaticContent.blue, Texture2D.blackTexture, true);
             Text.Anchor = TextAnchor.MiddleCenter;
-            string label = MEMOVERFLOW ? "Not Enough VRAM" : MemoryString(TotalUsage, MainMemory) + "/" + MemoryString(MainMemory, MainMemory);
+            string label = MEMOVERFLOW ? "GS_CacheWarnRAM".Translate() : MemoryString(TotalUsage, MainMemory) + "/" + MemoryString(MainMemory, MainMemory);
             Widgets.Label(barRect, label);
             Text.Anchor = default;
 
             if (Calculating)
             {
-                string calcLabel = "Calculating... Please wait. (" + MemoryUsageByMod.Count + "/" + CurrentMods.Count() + ")";
+                string calcLabel = $"{"GS_RecalcProcess".Translate()} ({MemoryUsageByMod.Count}/{CurrentMods.Count()})";
                 var textSize = Text.CalcHeight(calcLabel, rect.width);
                 Rect textRect = new Rect(0, curY + 5, rect.width, textSize);
                 Widgets.Label(textRect, calcLabel);
@@ -323,7 +323,9 @@ namespace GraphicSetter
             if (Critical)
             {
                 Text.Font = GameFont.Small;
-                string warningLabel = "Warning:\n" + (MEMOVERFLOW ? "Your system cannot support these settings.\nCompression will be enabled on startup." : "Your system may struggle with these settings.");
+                string warningLabel = "GS_CacheWarning".Translate((MEMOVERFLOW
+                    ? "GS_CacheWarnOverflow".Translate()
+                    : "GS_CacheWarnStruggle".Translate()));
                 var textSize = Text.CalcHeight(warningLabel, rect.width);
                 Rect warningLabelRect = new Rect(0, curY + 5, rect.width, textSize);
                 Widgets.Label(warningLabelRect, warningLabel);

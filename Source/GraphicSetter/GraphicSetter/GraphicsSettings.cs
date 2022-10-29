@@ -1,11 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using HarmonyLib;
-using RimWorld;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using Verse;
 
@@ -104,8 +97,8 @@ namespace GraphicSetter
             Widgets.DrawMenuSection(menuRect);
             //
             var tabs = new List<TabRecord>();
-            tabs.Add(new TabRecord("Advanced", delegate { SelTab = GraphicsTabOption.Advanced; }, SelTab == GraphicsTabOption.Advanced));
-            tabs.Add(new TabRecord("Memory", delegate { SelTab = GraphicsTabOption.Memory; }, SelTab == GraphicsTabOption.Memory));
+            tabs.Add(new TabRecord("GS_AdvancedTab".Translate(), delegate { SelTab = GraphicsTabOption.Advanced; }, SelTab == GraphicsTabOption.Advanced));
+            tabs.Add(new TabRecord("GS_MemoryTab".Translate(), delegate { SelTab = GraphicsTabOption.Memory; }, SelTab == GraphicsTabOption.Memory));
             TabDrawer.DrawTabs(tabRect, tabs);
 
             switch (SelTab)
@@ -134,9 +127,9 @@ namespace GraphicSetter
             return false;
         }
 
-        private string mipMapBiasToolTip = "This value changes how blurry textures can get depending on zoom, it is recommended to be equal or below 0.";
-        private string anisoLevelToolTip = "Set the level of anisotropic filtering, higher levels may reduce performance on older graphics cards.";
-        private string pawnAtlasToolTip = "Sets a multipler for the cached pawn atlas size, the higher the value the more detail your pawns will have - uses more memory.";
+        private string mipMapBiasToolTip = "GS_MipMapToolTip".Translate();
+        private string anisoLevelToolTip = "GS_AnisoLevelToolTip".Translate();
+        //private string pawnAtlasToolTip = "Sets a multipler for the cached pawn atlas size, the higher the value the more detail your pawns will have - uses more memory.";
 
         private void DrawAdvanced(Rect rect)
         {
@@ -144,17 +137,17 @@ namespace GraphicSetter
             var leftRect = rect.LeftHalf().ContractedBy(5).Rounded();
             listing.Begin(leftRect);
             {
-                listing.Label("General Settings");
+                listing.Label("GS_GeneralSettings".Translate());
                 listing.GapLine();
 
-                listing.CheckboxLabeled("(Recommended) Activate Mip-Mapping", ref mainSettings.useMipMap);
+                listing.CheckboxLabeled("GS_MipMapping".Translate(), ref mainSettings.useMipMap);
                 if (mainSettings.useMipMap)
                 {
-                    mainSettings.mipMapBias = listing.LabeledSlider("MipMap Bias", SettingsGroup.MipMapBiasRange,
-                        mainSettings.mipMapBias, "Sharpest", "Blurriest", mipMapBiasToolTip, 0.05f);
+                    mainSettings.mipMapBias = listing.LabeledSlider("GS_MipMapBias".Translate(), SettingsGroup.MipMapBiasRange,
+                        mainSettings.mipMapBias, "GS_MipMapSharp".Translate(), "GS_MipMapBlurry".Translate(), mipMapBiasToolTip, 0.05f);
                 }
 
-                mainSettings.anisoLevel = (int) listing.LabeledSlider("Anisotropic Filter Level", SettingsGroup.AnisoRange,
+                mainSettings.anisoLevel = (int) listing.LabeledSlider("GS_AnisoLevel".Translate(), SettingsGroup.AnisoRange,
                     mainSettings.anisoLevel,
                     tooltip: anisoLevelToolTip,
                     roundTo: 1);
@@ -163,15 +156,15 @@ namespace GraphicSetter
 
                 if (!mainSettings.IsDefault())
                 {
-                    if (listing.ButtonText("Reset"))
+                    if (listing.ButtonText("GS_Reset".Translate()))
                     {
                         mainSettings.Reset();
                     }
                 }
             }
             listing.End();
-
-
+            
+            /*
             var rightRect = rect.RightHalf().ContractedBy(5).Rounded();
             Listing_Standard listing2 = new Listing_Standard();
             listing2.Begin(rightRect);
@@ -204,7 +197,8 @@ namespace GraphicSetter
                 //listing2.RenderInListing(listing.curY, StaticContent.MemoryData.DrawPawnAtlasMemory);
             }
             listing2.End();
-
+            */
+            
             /*
             if (Widgets.ButtonText(resetButton2, "Drop atlas"))
             {
@@ -218,13 +212,13 @@ namespace GraphicSetter
             {
                 GUI.color = Color.red;
                 Text.Font = GameFont.Medium;
-                string text = "You will have to restart the game to apply changes!";
+                string text = "GS_RestartRequired".Translate();
                 Vector2 size = Text.CalcSize(text);
                 float x2 = (rect.width - size.x) / 2f;
                 float x3 = (rect.width - 150) / 2f;
                 float y2 = rect.yMax - 150;
                 Widgets.Label(new Rect(x2, y2, size.x, size.y), text);
-                if (Widgets.ButtonText(new Rect(x3, y2 + size.y, 150, 45), "Restart Game", true, true))
+                if (Widgets.ButtonText(new Rect(x3, y2 + size.y, 150, 45), "GS_RestartGameButton".Translate(), true, true))
                 {
                     this.Write();
                     GenCommandLine.Restart();
@@ -241,7 +235,7 @@ namespace GraphicSetter
 
         public void SetFilter(Listing_Standard listing)
         {
-            listing.Label("Texture Filtering: ");
+            listing.Label($"{"GS_TextureFiltering".Translate()}: ");
             if(listing.RadioButton(FilterMode.Bilinear.ToString(), mainSettings.filterMode == FilterMode.Bilinear))
             {
                 mainSettings.filterMode = FilterMode.Bilinear;
