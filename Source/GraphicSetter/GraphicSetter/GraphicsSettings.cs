@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 using Verse;
 
@@ -129,6 +130,17 @@ namespace GraphicSetter
         
         //private string pawnAtlasToolTip = "Sets a multipler for the cached pawn atlas size, the higher the value the more detail your pawns will have - uses more memory.";
 
+        private static string TranslateFilterOption(FilterMode filtering)
+        {
+            return filtering switch
+            {
+                FilterMode.Point => "GS_FilterModePoint".Translate(),
+                FilterMode.Bilinear => "GS_FilterModeBilinear".Translate(),
+                FilterMode.Trilinear => "GS_FilterModeTrilinear".Translate(),
+                _ => "Null"
+            };
+        }
+        
         private void DrawAdvanced(Rect rect)
         {
             Listing_Standard listing = new Listing_Standard();
@@ -234,11 +246,11 @@ namespace GraphicSetter
         public void SetFilter(Listing_Standard listing)
         {
             listing.Label($"{"GS_TextureFiltering".Translate()}: ");
-            if(listing.RadioButton(FilterMode.Bilinear.ToString(), mainSettings.filterMode == FilterMode.Bilinear))
+            if(listing.RadioButton(TranslateFilterOption(FilterMode.Bilinear), mainSettings.filterMode == FilterMode.Bilinear))
             {
                 mainSettings.filterMode = FilterMode.Bilinear;
             }
-            if (listing.RadioButton(FilterMode.Trilinear.ToString(), mainSettings.filterMode == FilterMode.Trilinear))
+            if (listing.RadioButton(TranslateFilterOption(FilterMode.Trilinear), mainSettings.filterMode == FilterMode.Trilinear))
             {
                 mainSettings.filterMode = FilterMode.Trilinear;
             }

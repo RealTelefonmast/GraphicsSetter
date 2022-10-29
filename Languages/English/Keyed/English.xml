@@ -16,6 +16,9 @@
 	<GS_AnisoLevel>Anisotropic Filter Level</GS_AnisoLevel>
 	
 	<GS_TextureFiltering>Texture Filtering</GS_TextureFiltering>
+	<!--<GS_FilterModePoint>Point</GS_FilterModePoint>-->
+	<GS_FilterModeBilinear>Bilinear</GS_FilterModeBilinear>
+	<GS_FilterModeTrilinear>Trilinear</GS_FilterModeTrilinear>
 	
 	<GS_Reset>Reset</GS_Reset>
 	<GS_RestartRequired>You will have to restart the game to apply changes!</GS_RestartRequired>
