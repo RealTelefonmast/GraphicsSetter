@@ -137,7 +137,7 @@ namespace GraphicSetter
             {
                 var label = "Options".Translate();
                 var idx = optList.FirstIndexOf(opt => opt.label == label);
-                if (idx > 0 && idx < optList.Count) optList.Insert(idx + 1, new ListableOption("Graphics Settings", delegate
+                if (idx > 0 && idx < optList.Count) optList.Insert(idx + 1, new ListableOption("GS_MenuTitle".Translate(), delegate
                 {
                     var dialog = new Dialog_ModSettings(GraphicSetter.ModRef);
                     var me = LoadedModManager.GetMod<GraphicSetter>();

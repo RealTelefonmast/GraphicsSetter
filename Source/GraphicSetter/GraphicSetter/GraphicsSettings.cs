@@ -126,9 +126,7 @@ namespace GraphicSetter
                 return true;
             return false;
         }
-
-        private string mipMapBiasToolTip = "GS_MipMapToolTip".Translate();
-        private string anisoLevelToolTip = "GS_AnisoLevelToolTip".Translate();
+        
         //private string pawnAtlasToolTip = "Sets a multipler for the cached pawn atlas size, the higher the value the more detail your pawns will have - uses more memory.";
 
         private void DrawAdvanced(Rect rect)
@@ -144,12 +142,12 @@ namespace GraphicSetter
                 if (mainSettings.useMipMap)
                 {
                     mainSettings.mipMapBias = listing.LabeledSlider("GS_MipMapBias".Translate(), SettingsGroup.MipMapBiasRange,
-                        mainSettings.mipMapBias, "GS_MipMapSharp".Translate(), "GS_MipMapBlurry".Translate(), mipMapBiasToolTip, 0.05f);
+                        mainSettings.mipMapBias, "GS_MipMapSharp".Translate(), "GS_MipMapBlurry".Translate(), "GS_MipMapToolTip".Translate(), 0.05f);
                 }
 
                 mainSettings.anisoLevel = (int) listing.LabeledSlider("GS_AnisoLevel".Translate(), SettingsGroup.AnisoRange,
                     mainSettings.anisoLevel,
-                    tooltip: anisoLevelToolTip,
+                    tooltip: "GS_AnisoLevelToolTip".Translate(),
                     roundTo: 1);
 
                 SetFilter(listing);

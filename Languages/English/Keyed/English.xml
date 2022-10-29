@@ -1,6 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <LanguageData>
 
+	<GS_MenuTitle>Graphics Setter</GS_MenuTitle>
+
 	<!--Tabs-->
 	<GS_AdvancedTab>Advanced</GS_AdvancedTab>
 	<GS_MemoryTab>Memory</GS_MemoryTab>

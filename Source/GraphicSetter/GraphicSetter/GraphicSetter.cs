@@ -49,7 +49,7 @@ namespace GraphicSetter
 
         public override string SettingsCategory()
         {
-            return "Graphics Setter";
+            return "GS_MenuTitle".Translate();
         }
 
         public override void DoSettingsWindowContents(Rect inRect)
