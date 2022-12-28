@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
+using RimWorld;
 using UnityEngine;
 using Verse;
 
@@ -12,7 +14,7 @@ namespace GraphicSetter
         public bool useAntiA = true;
         public bool useCustomPawnAtlas = false;
 
-        public float mipMapBias = -0.5f;
+        public float mipMapBias = 0.5f;
         public AntiAliasing antiALevel = AntiAliasing.FourX;
 
         public FilterMode filterMode = FilterMode.Trilinear;
@@ -26,7 +28,7 @@ namespace GraphicSetter
         public static readonly IntRange MainTexScaleRange = new IntRange(1, 2);
 
         public static readonly FloatRange AnisoRange = new FloatRange(1, 9);
-        public static readonly FloatRange MipMapBiasRange = new FloatRange(0.75f, -1f);
+        public static readonly FloatRange MipMapBiasRange = new FloatRange(-0.75f, 1f);
 
         public void ExposeData()
         {
@@ -52,7 +54,7 @@ namespace GraphicSetter
             if (anisoLevel != 6) return false;
             if (filterMode != FilterMode.Trilinear) return false;
             if (useMipMap != true) return false;
-            if (mipMapBias != -0.5f) return false;
+            if (mipMapBias != 0.5f) return false;
             if (pawnTexResScale != 4) return false;
             return true;
         }
@@ -62,7 +64,7 @@ namespace GraphicSetter
             anisoLevel = 6;
             filterMode = FilterMode.Trilinear;
             useMipMap = true;
-            mipMapBias = -0.5f;
+            mipMapBias = 0.5f;
             pawnTexResScale = 4;
         }
     }
@@ -171,6 +173,25 @@ namespace GraphicSetter
                     }
                 }
             }
+            
+            if (Prefs.DevMode)
+            {
+                /*
+                if (listing.ButtonText("DEBUG // Drop atlas"))
+                {
+                    string path = Path.GetFullPath("C:\\Users\\maxim\\Desktop\\AtlasTest");
+                    if (!Directory.Exists(path))
+                    {
+                        Directory.CreateDirectory(path);
+                    }
+                    
+                    Log.Message($"Dumping atlasses... {path}");
+                    GlobalTextureAtlasManager.DumpStaticAtlases(path);
+                    GlobalTextureAtlasManager.DumpPawnAtlases(path);
+                }
+                */
+            }
+            
             listing.End();
             
             /*
@@ -207,15 +228,7 @@ namespace GraphicSetter
             }
             listing2.End();
             */
-            
-            /*
-            if (Widgets.ButtonText(resetButton2, "Drop atlas"))
-            {
-                string path = Path.GetFullPath("C:\\Users\\maxim\\Desktop\\AtlasTest");
-                GlobalTextureAtlasManager.DumpStaticAtlases(path);
-                GlobalTextureAtlasManager.DumpPawnAtlases(path);
-            }
-            */
+
 
             if (AnySettingsChanged())
             {

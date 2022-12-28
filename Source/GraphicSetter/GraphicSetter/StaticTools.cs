@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Globalization;
 using System.IO;
 using RimWorld.IO;
 using UnityEngine;
@@ -76,7 +77,7 @@ namespace GraphicSetter
                 texture2D.name = Path.GetFileNameWithoutExtension(file.Name);
                 texture2D.filterMode = settings.filterMode;
                 texture2D.anisoLevel = settings.anisoLevel;
-                texture2D.mipMapBias = settings.mipMapBias;
+                texture2D.mipMapBias = -settings.mipMapBias; //Needs to be inverted because settings are inverted
                 texture2D.Apply(true, !readable);
 
             }
@@ -88,9 +89,10 @@ namespace GraphicSetter
         }
     
 
-        public static long TextureSize(VirtualFile file)
+        public static long TextureSize(VirtualFile file, out Vector2 textureSize)
         {
             var texture2D = LoadTexture(file, true);
+            textureSize = new Vector2(texture2D.width, texture2D.height);
             if (texture2D == null) return 0;
 
             long size = texture2D.GetRawTextureData().Length;
@@ -107,7 +109,7 @@ namespace GraphicSetter
             Widgets.Label(rect.TopHalf(), label);
             Text.Anchor = default;
 
-            value = Widgets.HorizontalSlider(rect.BottomHalf(), value, range.min, range.max, false, value.ToString(), leftLabel, rightLabel, roundTo);
+            value = Widgets.HorizontalSlider(rect.BottomHalf(), value, range.min, range.max, false, value.ToString(CultureInfo.InvariantCulture), leftLabel, rightLabel, roundTo);
             if (tooltip != null)
             {
                 TooltipHandler.TipRegion(rect, tooltip);

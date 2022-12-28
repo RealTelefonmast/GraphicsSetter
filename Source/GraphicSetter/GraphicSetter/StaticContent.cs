@@ -7,23 +7,24 @@ using static HarmonyLib.AccessTools;
 namespace GraphicSetter
 {
     [StaticConstructorOnStartup]
-    public static class StaticContent
+    internal static class StaticContent
     {
         //Inspired by Brrainz' patches
-        internal static AccessTools.FieldRef<Dialog_ModSettings, Mod> selModByRef = FieldRefAccess<Dialog_ModSettings, Mod>("mod");
-        private static GameObject RoutineHolder;
-        internal static GraphicsDriver CoroutineDriver;
-        internal static MemoryData MemoryData;
+        internal static readonly AccessTools.FieldRef<Dialog_ModSettings, Mod> selModByRef = FieldRefAccess<Dialog_ModSettings, Mod>("mod");
+        internal static readonly GraphicsDriver CoroutineDriver;
+        internal static readonly MemoryData MemoryData;
 
+        //
         static StaticContent()
         {
             MemoryData = new MemoryData();
-            RoutineHolder = new GameObject("GraphicsSettingsDriver");
-            UnityEngine.Object.DontDestroyOnLoad(RoutineHolder);
-            RoutineHolder.AddComponent<GraphicsDriver>();
-            CoroutineDriver = RoutineHolder.GetComponent<GraphicsDriver>();
+            var routineHolder = new GameObject("GraphicsSettingsDriver");
+            Object.DontDestroyOnLoad(routineHolder);
+            routineHolder.AddComponent<GraphicsDriver>();
+            CoroutineDriver = routineHolder.GetComponent<GraphicsDriver>();
         }
 
+        //
         public static readonly Texture2D clear = SolidColorMaterials.NewSolidColorTexture(Color.clear);
         public static readonly Texture2D grey = SolidColorMaterials.NewSolidColorTexture(Color.grey);
         public static readonly Texture2D blue = SolidColorMaterials.NewSolidColorTexture(new ColorInt(38, 169, 224).ToColor);

@@ -6,7 +6,7 @@ namespace GraphicSetter
 {
     public class DisposableTexture : IDisposable
     {
-        private Texture2D texture;
+        private readonly Texture2D texture;
         private bool disposed;
 
         public DisposableTexture(Texture2D texture)
@@ -14,12 +14,15 @@ namespace GraphicSetter
             this.texture = texture;
         }
 
-        public virtual void Dispose(bool disposing)
+        private void Dispose(bool disposing)
         {
             if (!disposed)
             {
-                if(texture != null)
+                if (texture != null)
+                {
                     Object.Destroy(texture);
+                    disposed = true;
+                }
             }
         }
 

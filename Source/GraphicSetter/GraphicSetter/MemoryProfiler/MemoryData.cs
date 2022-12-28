@@ -11,7 +11,7 @@ namespace GraphicSetter
     public class MemoryData
     {
         //private static Dictionary<ModContentPack, long> RawMemoryUsageByMod = new Dictionary<ModContentPack, long>();
-        private static readonly Dictionary<ModContentPack, long> MemoryUsageByMod = new();
+        private static readonly Dictionary<ModContentPack, CachedModData> ModData = new();
         private static readonly Dictionary<Pair<string, bool>, long> MemoryUsageByAtlas = new();
 
         private static Color ListingBG = new ColorInt(32, 36, 40).ToColor;
@@ -21,7 +21,7 @@ namespace GraphicSetter
         private bool shouldRecalc = false;
         private bool shouldStop = false;
 
-        private long TotalBytes => MemoryUsageByMod.Sum(t => t.Value);
+        private long TotalBytes => ModData.Sum(t => t.Value.MemoryUsage);
         private long TotalBytesAtlas => MemoryUsageByAtlas.Sum(t => t.Value);
 
         private long TotalUsage => TotalBytes + TotalBytesAtlas;
@@ -59,7 +59,7 @@ namespace GraphicSetter
         {
             shouldRecalc = false;
             shouldStop = false;
-            MemoryUsageByMod.Clear();
+            ModData.Clear();
         }
 
         public Coroutine routine, routine2;
@@ -104,9 +104,9 @@ namespace GraphicSetter
             }
         }
 
-        public IEnumerator DoTheThing()
+        private IEnumerator DoTheThing()
         {
-            MemoryUsageByMod.Clear();
+            ModData.Clear();
             int count = CurrentMods.Count();
             int k = 0;
             while (shouldStop || k < count)
@@ -117,7 +117,7 @@ namespace GraphicSetter
                     continue;
                 }
                 var mod = CurrentMods.ElementAt(k);
-                MemoryUsageByMod.Add(mod, 0);
+                ModData.Add(mod, new CachedModData(mod));
                 Dictionary<string, FileInfo> allFilesForMod = ModContentPack.GetAllFilesForMod(mod, GenFilePaths.ContentPath<Texture2D>(), (ModContentLoader<Texture2D>.IsAcceptableExtension));
                 int i = 0;
                 while (shouldStop || i < allFilesForMod.Count)
@@ -128,12 +128,12 @@ namespace GraphicSetter
                         continue;
                     }
                     var pair = allFilesForMod.ElementAt(i);
-                    MemoryUsageByMod[mod] += StaticTools.TextureSize(new VirtualFileWrapper(pair.Value));
+                    ModData[mod].RegisterTexture(new VirtualFileWrapper(pair.Value));
                     i++;
                     if (i % 3 == 0) yield return null;
                 }
 
-                LargestModSize = MemoryUsageByMod[mod] > LargestModSize ? MemoryUsageByMod[mod] : LargestModSize;
+                LargestModSize = ModData[mod].MemoryUsage > LargestModSize ? ModData[mod].MemoryUsage : LargestModSize;
                 k++;
             }
             shouldRecalc = false;
@@ -159,15 +159,15 @@ namespace GraphicSetter
         private float MemoryPctOf(ModContentPack mod, out long memUsage)
         {
             memUsage = 0;
-            if (!MemoryUsageByMod.ContainsKey(mod)) return 0;
-            memUsage = MemoryUsageByMod[mod];
+            if (!ModData.ContainsKey(mod)) return 0;
+            memUsage = ModData[mod].MemoryUsage;
             return (float)((double)memUsage / (double)TotalBytes);
         }
 
         private Color GetColorFor(ModContentPack mod)
         {
-            if (!MemoryUsageByMod.ContainsKey(mod)) return Color.green;
-            var memUsage = MemoryUsageByMod[mod];
+            if (!ModData.ContainsKey(mod)) return Color.green;
+            var memUsage = ModData[mod].MemoryUsage;
             var floatPct = (float)((double)memUsage / (double)LargestModSize);
             return Color.Lerp(NiceBlue, Color.magenta, floatPct);
         }
@@ -212,6 +212,8 @@ namespace GraphicSetter
             WriteProcessingData(bottomHalf);
         }
 
+        private static ModContentPack SelMod;
+
         public void DrawModList(Rect rect)
         {
             rect = new Rect(rect.x, rect.y + 20, rect.width, rect.height - 20);
@@ -230,10 +232,11 @@ namespace GraphicSetter
             GUI.BeginGroup(leftSide);
             {
                 int y = 0;
-                Rect viewRect = new Rect(0, 0, leftSide.width, CurrentMods.Count() * 20);
+                int extraY = SelMod != null ? 80 : 0;
+                Rect viewRect = new Rect(0, 0, leftSide.width, (CurrentMods.Count() * 20) + extraY);
                 Widgets.BeginScrollView(new Rect(0, 0, leftSide.width, leftSide.height), ref scrollview, viewRect, false);
-                var list = MemoryUsageByMod.ToList();
-                list.Sort((p1, p2) => p2.Value.CompareTo(p1.Value));
+                var list = ModData.ToList();
+                list.Sort((p1, p2) => p2.Value.MemoryUsage.CompareTo(p1.Value.MemoryUsage));
                 foreach (var mod in list)
                 {
                     var pct = MemoryPctOf(mod.Key, out long memUsage);
@@ -245,10 +248,21 @@ namespace GraphicSetter
                     //row.FillableBar(newRect.width, 18, pct, text, GetColorFor(pct), StaticContent.clear);
                     Widgets.DrawHighlightIfMouseover(tipRect);
                     TooltipHandler.TipRegion(tipRect, text);
+                    if (Widgets.ButtonInvisible(tipRect))
+                    {
+                        SelMod = SelMod != null ? null : mod.Key;
+                    }
+
+                    if (SelMod == mod.Key)
+                    {
+                        DrawSelModReadout(mod.Key, new Rect(0, tipRect.yMax, tipRect.width, 80));
+                        y += 80;
+                    }
+                    
                     y += 20;
                 }
 
-                if (!MemoryUsageByMod.Any())
+                if (!ModData.Any())
                 {
                     string text = CurrentMods.Any()
                         ? "GS_ModsToProcessLabel".Translate(CurrentMods.Count())
@@ -284,6 +298,16 @@ namespace GraphicSetter
             GUI.EndGroup();
         }
 
+        private void DrawSelModReadout(ModContentPack selMod, Rect rect)
+        {
+            Listing_Standard listing = new Listing_Standard();
+            listing.Begin(rect);
+            listing.Label($"TotalTextures: {ModData[selMod].TotalTextureCount.ToString()}");
+            listing.Label($"TotalTextures In Atlas: {ModData[selMod].TexturesInAtlasCount.ToString()}");
+            listing.Label($"TotalTextures Outside Atlas: {ModData[selMod].TexturesWithoutAtlasCount.ToString()}");
+            listing.End();
+        }
+
         public void WriteProcessingData(Rect rect)
         {
             GUI.BeginGroup(rect);
@@ -305,7 +329,7 @@ namespace GraphicSetter
 
             if (Calculating)
             {
-                string calcLabel = $"{"GS_RecalcProcess".Translate()} ({MemoryUsageByMod.Count}/{CurrentMods.Count()})";
+                string calcLabel = $"{"GS_RecalcProcess".Translate()} ({ModData.Count}/{CurrentMods.Count()})";
                 var textSize = Text.CalcHeight(calcLabel, rect.width);
                 Rect textRect = new Rect(0, curY + 5, rect.width, textSize);
                 Widgets.Label(textRect, calcLabel);
