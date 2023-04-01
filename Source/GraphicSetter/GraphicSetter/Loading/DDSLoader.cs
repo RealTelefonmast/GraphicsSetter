@@ -199,7 +199,10 @@ namespace GraphicSetter
                 if (isCompressed && quality > 0 && (dwWidth >> quality) % 4 != 0 && (dwHeight >> quality) % 4 != 0)
                     QualitySettings.masterTextureLimit = 0;
 
-                Texture2D texture = new Texture2D(dwWidth, dwHeight, textureFormat, dwMipMapCount > 1);
+                // Unity texture loader cannot load mipmaps when the width or height of the image is not divisible by 4.
+                // To prevent exceptions, mipmap loading is disabled for these textures.
+                bool loadMipmaps = dwMipMapCount > 1 && dwWidth % 4 == 0 && dwHeight % 4 == 0;
+                Texture2D texture = new Texture2D(dwWidth, dwHeight, textureFormat, loadMipmaps);
                 texture.LoadRawTextureData(dxtBytes);
                 return texture;
             }
