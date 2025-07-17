@@ -1,60 +1,41 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Reflection;
-using System.Reflection.Emit;
-using RimWorld.IO;
-using RuntimeAudioClipLoader;
+﻿using HarmonyLib;
 using UnityEngine;
-using HarmonyLib;
-using RimWorld;
-using UnityEngine.Profiling;
-using UnityEngine.Rendering;
 using Verse;
 
-namespace GraphicSetter
+namespace GraphicSetter;
+
+public class GraphicSetter : Mod
 {
-    public class GraphicSetter : Mod
+    public static GraphicSetter ModRef { get; private set; }
+
+    public static GraphicsSettings Settings { get; private set; }
+
+    public GraphicSetter(ModContentPack content) : base(content)
     {
-        private static GraphicsSettings settings;
+        ModRef = this;
+        Log.Message("[1.6]Graphics Setter - Loaded");
+        Settings = GetSettings<GraphicsSettings>();
+        //profiler = new ResourceProfiler();
+        var graphics = new Harmony("com.telefonmast.graphicssettings.rimworld.mod");
 
-        public static GraphicSetter ModRef { get; private set; }
-        
-        public static GraphicsSettings Settings
-        {
-            get => settings;
-            private set => settings = value;
-        }
+        //Maybe obsolete?
+        //graphics.Patch(AccessTools.Constructor(typeof(PawnTextureAtlas)), transpiler: new(typeof(GraphicsPatches.PawnTextureAtlasCtorPatch).GetMethod(nameof(GraphicsPatches.PawnTextureAtlasCtorPatch.Transpiler)), Priority.First));
+        graphics.PatchAll();
+    }
 
-        public GraphicSetter(ModContentPack content) : base(content)
-        {
-            ModRef = this;
-            Log.Message("[1.3]Graphics Setter - Loaded");
-            Settings = GetSettings<GraphicsSettings>();
-            //profiler = new ResourceProfiler();
-            Harmony graphics = new Harmony("com.telefonmast.graphicssettings.rimworld.mod");
-            
-            //Maybe obsolete?
-            //graphics.Patch(AccessTools.Constructor(typeof(PawnTextureAtlas)), transpiler: new(typeof(GraphicsPatches.PawnTextureAtlasCtorPatch).GetMethod(nameof(GraphicsPatches.PawnTextureAtlasCtorPatch.Transpiler)), Priority.First));
-            graphics.PatchAll();
-        }
+    public override void WriteSettings()
+    {
+        Settings.Write();
+        base.WriteSettings();
+    }
 
-        public override void WriteSettings()
-        {
-            Settings.Write();
-            base.WriteSettings();
-        }
+    public override string SettingsCategory()
+    {
+        return "GS_MenuTitle".Translate();
+    }
 
-        public override string SettingsCategory()
-        {
-            return "GS_MenuTitle".Translate();
-        }
-
-        public override void DoSettingsWindowContents(Rect inRect)
-        {
-            Settings.DoSettingsWindowContents(inRect);
-        }
+    public override void DoSettingsWindowContents(Rect inRect)
+    {
+        Settings.DoSettingsWindowContents(inRect);
     }
 }

@@ -1,288 +1,279 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using RimWorld;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using Verse;
 
-namespace GraphicSetter
+namespace GraphicSetter;
+
+public class SettingsGroup : IExposable
 {
-    public class SettingsGroup : IExposable
+    public bool enableDDSLoading = true;
+    public bool overrideMipMapBias = false;
+    public float mipMapBias = 0.0f;
+    public bool verboseLogging = false;
+    
+    public static readonly FloatRange MipMapBiasRange = new FloatRange(-1f, 1f);
+    
+    public void ExposeData()
     {
-        //
-        public bool useMipMap = true;
-        public bool useAntiA = true;
-        public bool useCustomPawnAtlas = false;
-
-        public float mipMapBias = 0.5f;
-        public AntiAliasing antiALevel = AntiAliasing.FourX;
-
-        public FilterMode filterMode = FilterMode.Trilinear;
-        public int anisoLevel = 6;
-
-        public int pawnTexResScale = 4;
-        public int mainTexResScale = 1;
-
-        //FIXED RANGE DATA
-        public static readonly FloatRange PawnTexScaleRange = new FloatRange(1, 4);
-        public static readonly IntRange MainTexScaleRange = new IntRange(1, 2);
-
-        public static readonly FloatRange AnisoRange = new FloatRange(1, 9);
-        public static readonly FloatRange MipMapBiasRange = new FloatRange(-0.75f, 1f);
-
-        public void ExposeData()
-        {
-            Scribe_Values.Look(ref anisoLevel, "anisoLevel");
-            Scribe_Values.Look(ref useMipMap, "useMipMap");
-            Scribe_Values.Look(ref useAntiA, "useAntiA");
-            Scribe_Values.Look(ref useCustomPawnAtlas, "useCustomPawnAtlas");
-            Scribe_Values.Look(ref filterMode, "filterMode");
-            Scribe_Values.Look(ref mipMapBias, "mipMapBias");
-            Scribe_Values.Look(ref pawnTexResScale, "pawnTexResScale");
-
-            if (Scribe.mode == LoadSaveMode.PostLoadInit)
-            {
-                if (pawnTexResScale > 4)
-                {
-                    pawnTexResScale = 4;
-                }
-            }
-        }
-
-        public bool IsDefault()
-        {
-            if (anisoLevel != 6) return false;
-            if (filterMode != FilterMode.Trilinear) return false;
-            if (useMipMap != true) return false;
-            if (mipMapBias != 0.5f) return false;
-            if (pawnTexResScale != 4) return false;
-            return true;
-        }
-
-        public void Reset()
-        {
-            anisoLevel = 6;
-            filterMode = FilterMode.Trilinear;
-            useMipMap = true;
-            mipMapBias = 0.5f;
-            pawnTexResScale = 4;
-        }
+        Scribe_Values.Look(ref enableDDSLoading, "enableDDSLoading", true);
+        Scribe_Values.Look(ref overrideMipMapBias, "overrideMipMapBias", false);
+        Scribe_Values.Look(ref mipMapBias, "mipMapBias", 0.0f);
+        Scribe_Values.Look(ref verboseLogging, "verboseLogging", false);
     }
-
-    public class GraphicsSettings : ModSettings
+    
+    public bool IsDefault()
     {
-        private SettingsGroup lastSettings = new SettingsGroup();
-        public bool CausedMemOverflow = false;
+        return enableDDSLoading && !overrideMipMapBias && mipMapBias == 0.0f && !verboseLogging;
+    }
+    
+    public void Reset()
+    {
+        enableDDSLoading = true;
+        overrideMipMapBias = false;
+        mipMapBias = 0.0f;
+        verboseLogging = false;
+    }
+}
 
-        internal enum GraphicsTabOption
+public class GraphicsSettings : ModSettings
+{
+    public static SettingsGroup mainSettings = new SettingsGroup();
+    
+    internal enum GraphicsTabOption
+    {
+        Advanced,
+        Memory
+    }
+    
+    private GraphicsTabOption SelTab { get; set; } = GraphicsTabOption.Advanced;
+    
+    public GraphicsSettings()
+    {
+        mainSettings = new SettingsGroup();
+    }
+    
+    public void DoSettingsWindowContents(Rect inRect)
+    {
+        GUI.BeginGroup(inRect);
+        
+        // Tab area
+        Rect tabRect = new Rect(0, TabDrawer.TabHeight, inRect.width, 0);
+        Rect menuRect = new Rect(0, TabDrawer.TabHeight, inRect.width, inRect.height - TabDrawer.TabHeight);
+
+        // Draw background
+        Widgets.DrawMenuSection(menuRect);
+        
+        // Create tabs
+        var tabs = new List<TabRecord>();
+        tabs.Add(new TabRecord("GS_AdvancedTab".Translate(), delegate { SelTab = GraphicsTabOption.Advanced; }, SelTab == GraphicsTabOption.Advanced));
+        tabs.Add(new TabRecord("GS_MemoryTab".Translate(), delegate { SelTab = GraphicsTabOption.Memory; }, SelTab == GraphicsTabOption.Memory));
+        TabDrawer.DrawTabs(tabRect, tabs);
+        
+        // Content area with padding
+        var contentRect = menuRect.ContractedBy(15);
+        
+        switch (SelTab)
         {
-            Advanced,
-            Memory
-        }
-
-        //SETTINGS
-        public static SettingsGroup mainSettings;
-
-        private GraphicsTabOption SelTab { get; set; } = GraphicsTabOption.Advanced;
-
-        public GraphicsSettings()
-        {
-            mainSettings = new SettingsGroup();
-        }
-
-        public void DoSettingsWindowContents(Rect inRect)
-        {
-            //
-            GUI.BeginGroup(inRect);
-            Rect tabRect = new Rect(0, TabDrawer.TabHeight, inRect.width, 0);
-            Rect menuRect = new Rect(0, TabDrawer.TabHeight, inRect.width, inRect.height - TabDrawer.TabHeight);
-
-            Widgets.DrawMenuSection(menuRect);
-            //
-            var tabs = new List<TabRecord>();
-            tabs.Add(new TabRecord("GS_AdvancedTab".Translate(), delegate { SelTab = GraphicsTabOption.Advanced; }, SelTab == GraphicsTabOption.Advanced));
-            tabs.Add(new TabRecord("GS_MemoryTab".Translate(), delegate { SelTab = GraphicsTabOption.Memory; }, SelTab == GraphicsTabOption.Memory));
-            TabDrawer.DrawTabs(tabRect, tabs);
-
-            switch (SelTab)
-            {
-                case GraphicsTabOption.Advanced:
-                    DrawAdvanced(menuRect.ContractedBy(15));
-                    break;
-                case GraphicsTabOption.Memory:
-                    DrawMemory(menuRect.ContractedBy(10));
-                    break;
-            }
-
-            GUI.EndGroup();
-        }
-
-        public bool AnySettingsChanged()
-        {
-            if (mainSettings.anisoLevel != lastSettings.anisoLevel)
-                return true;
-            if (mainSettings.filterMode != lastSettings.filterMode)
-                return true;
-            if (mainSettings.mipMapBias != lastSettings.mipMapBias)
-                return true;
-            if (mainSettings.useMipMap != lastSettings.useMipMap)
-                return true;
-            return false;
+            case GraphicsTabOption.Advanced:
+                DrawAdvanced(contentRect);
+                break;
+            case GraphicsTabOption.Memory:
+                DrawMemory(contentRect);
+                break;
         }
         
-        //private string pawnAtlasToolTip = "Sets a multipler for the cached pawn atlas size, the higher the value the more detail your pawns will have - uses more memory.";
-
-        private static string TranslateFilterOption(FilterMode filtering)
+        GUI.EndGroup();
+    }
+    
+    private void DrawAdvanced(Rect rect)
+    {
+        var listing = new Listing_Standard();
+        listing.Begin(rect);
+        
+        // Main header with icon/symbol
+        //DrawSectionHeader(listing, "DDS Texture Loading", "⚡");
+        
+        // Main toggle with better spacing
+        //listing.Gap(8);
+        var enableRect = listing.GetRect(26);
+        bool wasEnabled = mainSettings.enableDDSLoading;
+        Widgets.CheckboxLabeled(enableRect, "Enable DDS texture loading", ref mainSettings.enableDDSLoading);
+        
+        // Subtle description
+        GUI.color = new Color(0.7f, 0.7f, 0.7f);
+        Text.Font = GameFont.Tiny;
+        var ddsLoadingDesc = "Loads compressed textures when available\n • Reduces memory usage\n • Improves loading times";
+        var size = Text.CalcSize(ddsLoadingDesc);
+        var descRect = listing.GetRect(size.y);
+        Widgets.Label(descRect.ContractedBy(25, 0), 
+            ddsLoadingDesc);
+        Text.Font = GameFont.Small;
+        GUI.color = Color.white;
+        
+        //listing.Gap(25);
+        
+        // Advanced section with visual separator
+        //DrawSectionHeader(listing, "Advanced Options", "⚙");
+        //listing.Gap(8);
+        
+        /*// Mipmap bias section
+        var biasRect = listing.GetRect(24);
+        Widgets.CheckboxLabeled(biasRect, "Override Mipmap Bias", ref mainSettings.overrideMipMapBias);
+        
+        if (mainSettings.overrideMipMapBias)
         {
-            return filtering switch
+            listing.Gap(10);
+            
+            // Custom styled slider
+            var sliderBg = listing.GetRect(30);
+            
+            // Draw slider background
+            GUI.color = new Color(0.2f, 0.2f, 0.2f);
+            Widgets.DrawBox(sliderBg);
+            GUI.color = Color.white;
+            
+            // Draw the slider
+            var sliderInner = sliderBg.ContractedBy(3);
+            mainSettings.mipMapBias = Widgets.HorizontalSlider(
+                sliderInner,
+                mainSettings.mipMapBias,
+                SettingsGroup.MipMapBiasRange.min,
+                SettingsGroup.MipMapBiasRange.max,
+                true,
+                $"Bias: {mainSettings.mipMapBias:F2}",
+                "Blurry",
+                "Sharp",
+                0.01f);
+            
+            // Visual indicator below
+            listing.Gap(4);
+            GUI.color = GetMipmapColor(mainSettings.mipMapBias);
+            Text.Anchor = TextAnchor.MiddleCenter;
+            var indicatorRect = listing.GetRect(18);
+            Widgets.Label(indicatorRect, GetMipmapDescription(mainSettings.mipMapBias));
+            Text.Anchor = TextAnchor.UpperLeft;
+            GUI.color = Color.white;
+        }*/
+        
+        // Bottom section with stats
+        listing.Gap(30);
+        DrawQuickStats(listing);
+        
+        // Reset button if not default
+        if (!mainSettings.IsDefault())
+        {
+            listing.Gap(20);
+            var buttonRect = listing.GetRect(35);
+            var centeredButton = new Rect(buttonRect.center.x - 100, buttonRect.y, 200, 35);
+            
+            if (Widgets.ButtonText(centeredButton, "Reset to Defaults", true, true, true))
             {
-                FilterMode.Point => "GS_FilterModePoint".Translate(),
-                FilterMode.Bilinear => "GS_FilterModeBilinear".Translate(),
-                FilterMode.Trilinear => "GS_FilterModeTrilinear".Translate(),
-                _ => "Null"
-            };
+                mainSettings.Reset();
+            }
         }
         
-        private void DrawAdvanced(Rect rect)
+        listing.End();
+    }
+    
+    private void DrawSectionHeader(Listing_Standard listing, string text, string icon = null)
+    {
+        var headerRect = listing.GetRect(30);
+        
+        // Draw separator line above
+        var lineRect = new Rect(headerRect.x, headerRect.y + 5, headerRect.width, 1);
+        GUI.color = new Color(0.3f, 0.3f, 0.3f);
+        Widgets.DrawLineHorizontal(lineRect.x, lineRect.y, lineRect.width);
+        GUI.color = Color.white;
+        
+        // Draw header text with icon
+        Text.Font = GameFont.Medium;
+        var headerTextRect = headerRect;
+        headerTextRect.y += 10;
+        
+        if (!string.IsNullOrEmpty(icon))
         {
-            Listing_Standard listing = new Listing_Standard();
-            var leftRect = rect.LeftHalf().ContractedBy(5).Rounded();
-            listing.Begin(leftRect);
-            {
-                listing.Label("GS_GeneralSettings".Translate());
-                listing.GapLine();
-
-                listing.CheckboxLabeled("GS_MipMapping".Translate(), ref mainSettings.useMipMap);
-                if (mainSettings.useMipMap)
-                {
-                    mainSettings.mipMapBias = listing.LabeledSlider("GS_MipMapBias".Translate(), SettingsGroup.MipMapBiasRange, mainSettings.mipMapBias, "GS_MipMapBlurry".Translate(),"GS_MipMapSharp".Translate(), "GS_MipMapToolTip".Translate(), 0.05f);
-                }
-
-                mainSettings.anisoLevel = (int) listing.LabeledSlider("GS_AnisoLevel".Translate(), SettingsGroup.AnisoRange,
-                    mainSettings.anisoLevel,
-                    tooltip: "GS_AnisoLevelToolTip".Translate(),
-                    roundTo: 1);
-
-                SetFilter(listing);
-
-                if (!mainSettings.IsDefault())
-                {
-                    if (listing.ButtonText("GS_Reset".Translate()))
-                    {
-                        mainSettings.Reset();
-                    }
-                }
-            }
-            
-            if (Prefs.DevMode)
-            {
-                /*
-                if (listing.ButtonText("DEBUG // Drop atlas"))
-                {
-                    string path = Path.GetFullPath("C:\\Users\\maxim\\Desktop\\AtlasTest");
-                    if (!Directory.Exists(path))
-                    {
-                        Directory.CreateDirectory(path);
-                    }
-                    
-                    Log.Message($"Dumping atlasses... {path}");
-                    GlobalTextureAtlasManager.DumpStaticAtlases(path);
-                    GlobalTextureAtlasManager.DumpPawnAtlases(path);
-                }
-                */
-            }
-            
-            listing.End();
-            
-            /*
-            var rightRect = rect.RightHalf().ContractedBy(5).Rounded();
-            Listing_Standard listing2 = new Listing_Standard();
-            listing2.Begin(rightRect);
-            {
-                listing2.Label("Pawn Render Settings");
-                listing2.GapLine();
-
-                listing2.CheckboxLabeled("Custom Pawn Atlas", ref mainSettings.useCustomPawnAtlas);
-
-                if (mainSettings.useCustomPawnAtlas)
-                {
-                    mainSettings.pawnTexResScale = (int) listing2.LabeledSlider("Pawn Atlas Scale", SettingsGroup.PawnTexScaleRange, mainSettings.pawnTexResScale, roundTo: 1, tooltip: pawnAtlasToolTip);
-
-                    listing2.Gap();
-                    if (listing2.ButtonTextEnabled("Apply Atlas", Current.ProgramState == ProgramState.Playing, "Can only apply during running game."))
-                    {
-                        foreach (PawnTextureAtlas pawnTextureAtlas in GlobalTextureAtlasManager.pawnTextureAtlases)
-                        {
-                            pawnTextureAtlas.Destroy();
-                        }
-                    }
-
-                    if (mainSettings.pawnTexResScale > 2)
-                    {
-                        GUI.color = Color.red;
-                        listing2.Label("Warning: Higher texture scaling uses more VRAM!");
-                        GUI.color = Color.white;
-                    }
-                }
-                //listing2.RenderInListing(listing.curY, StaticContent.MemoryData.DrawPawnAtlasMemory);
-            }
-            listing2.End();
-            */
-
-
-            if (AnySettingsChanged())
-            {
-                GUI.color = Color.red;
-                Text.Font = GameFont.Medium;
-                string text = "GS_RestartRequired".Translate();
-                Vector2 size = Text.CalcSize(text);
-                float x2 = (rect.width - size.x) / 2f;
-                float x3 = (rect.width - 150) / 2f;
-                float y2 = rect.yMax - 150;
-                Widgets.Label(new Rect(x2, y2, size.x, size.y), text);
-                if (Widgets.ButtonText(new Rect(x3, y2 + size.y, 150, 45), "GS_RestartGameButton".Translate(), true, true))
-                {
-                    this.Write();
-                    GenCommandLine.Restart();
-                }
-                Text.Font = GameFont.Small;
-                GUI.color = Color.white;
-            }
+            GUI.color = new Color(0.8f, 0.8f, 0.3f); // Golden accent color
+            var iconRect = new Rect(headerTextRect.x, headerTextRect.y, 30, 30);
+            Text.Anchor = TextAnchor.MiddleCenter;
+            Widgets.Label(iconRect, icon);
+            Text.Anchor = TextAnchor.UpperLeft;
+            GUI.color = Color.white;
+            headerTextRect.x += 35;
         }
-
-        public void DrawMemory(Rect rect)
+        
+        Widgets.Label(headerTextRect, text);
+        Text.Font = GameFont.Small;
+        
+        listing.Gap(5);
+    }
+    
+    private void DrawQuickStats(Listing_Standard listing)
+    {
+        // Quick stats box
+        var statsRect = listing.GetRect(60);
+        
+        GUI.color = new Color(0.15f, 0.15f, 0.15f);
+        Widgets.DrawBox(statsRect);
+        GUI.color = Color.white;
+        
+        var innerStats = statsRect.ContractedBy(10);
+        
+        // Calculate some basic stats
+        int textureCount = Resources.FindObjectsOfTypeAll<Texture2D>().Length;
+        bool ddsActive = mainSettings.enableDDSLoading;
+        
+        Text.Anchor = TextAnchor.MiddleLeft;
+        GUI.color = new Color(0.8f, 0.8f, 0.8f);
+        
+        var line1 = new Rect(innerStats.x, innerStats.y + 5, innerStats.width, 20);
+        var line2 = new Rect(innerStats.x, innerStats.y + 25, innerStats.width, 20);
+        
+        Widgets.Label(line1, $"Status: {(ddsActive ? "DDS Loading Active" : "Standard Loading")}");
+        Widgets.Label(line2, $"Textures in memory: {textureCount}");
+        
+        if (ddsActive)
         {
-            StaticContent.MemoryData.DrawMemoryData(rect);
+            GUI.color = new Color(0.4f, 0.8f, 0.4f);
+            var statusDot = new Rect(line1.xMax - 20, line1.y + 5, 10, 10);
+            Widgets.DrawBoxSolid(statusDot, GUI.color);
         }
-
-        public void SetFilter(Listing_Standard listing)
+        
+        Text.Anchor = TextAnchor.UpperLeft;
+        GUI.color = Color.white;
+    }
+    
+    private Color GetMipmapColor(float bias)
+    {
+        if (bias < -0.5f) return new Color(0.4f, 0.6f, 1f); // Blue for performance
+        if (bias < 0f) return new Color(0.4f, 0.8f, 0.8f);
+        if (bias == 0f) return new Color(0.7f, 0.7f, 0.7f); // Gray for balanced
+        if (bias < 0.5f) return new Color(0.8f, 0.8f, 0.4f);
+        return new Color(1f, 0.6f, 0.4f); // Orange for quality
+    }
+    
+    private string GetMipmapDescription(float bias)
+    {
+        if (bias < -0.5f) return "Performance mode";
+        if (bias < 0f) return "Balanced-Performance";
+        if (bias == 0f) return "Balanced (Default)";
+        if (bias < 0.5f) return "Balanced-Quality";
+        return "Quality mode";
+    }
+    
+    public void DrawMemory(Rect rect)
+    {
+        // Your existing memory tab implementation
+        StaticContent.MemoryData.DrawMemoryData(rect);
+    }
+    
+    public override void ExposeData()
+    {
+        base.ExposeData();
+        Scribe_Deep.Look(ref mainSettings, "settings");
+        
+        if (Scribe.mode == LoadSaveMode.PostLoadInit)
         {
-            listing.Label($"{"GS_TextureFiltering".Translate()}: ");
-            if(listing.RadioButton(TranslateFilterOption(FilterMode.Bilinear), mainSettings.filterMode == FilterMode.Bilinear))
-            {
-                mainSettings.filterMode = FilterMode.Bilinear;
-            }
-            if (listing.RadioButton(TranslateFilterOption(FilterMode.Trilinear), mainSettings.filterMode == FilterMode.Trilinear))
-            {
-                mainSettings.filterMode = FilterMode.Trilinear;
-            }
-        }
-
-        public override void ExposeData()
-        {
-            base.ExposeData();
-            Scribe_Deep.Look(ref mainSettings, "settings");
-            Scribe_Values.Look(ref CausedMemOverflow, "causedOverflow");
-
-            if (Scribe.mode == LoadSaveMode.PostLoadInit)
-            {
-                mainSettings ??= new SettingsGroup();
-                lastSettings = new SettingsGroup();
-                lastSettings.anisoLevel = mainSettings.anisoLevel;
-                lastSettings.useMipMap = mainSettings.useMipMap;
-                lastSettings.filterMode = mainSettings.filterMode;
-                lastSettings.mipMapBias = mainSettings.mipMapBias;
-            }
+            mainSettings ??= new SettingsGroup();
         }
     }
 }
