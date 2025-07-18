@@ -1,0 +1,46 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+
+	<GS_MenuTitle>Настройщик графики</GS_MenuTitle>
+
+	<!--Tabs-->
+	<GS_AdvancedTab>Расширенные</GS_AdvancedTab>
+	<GS_MemoryTab>Память</GS_MemoryTab>
+	
+	<!--Settings-->
+	<GS_GeneralSettings>Общие настройки</GS_GeneralSettings>
+	<GS_MipMapping>(Рекомендуется) Активировать MIP-текстурирование</GS_MipMapping>
+	<GS_MipMapBias>MipMap значение</GS_MipMapBias>
+	<GS_MipMapSharp>Резко</GS_MipMapSharp>
+	<GS_MipMapBlurry>Размыто</GS_MipMapBlurry>
+	<GS_AnisoLevel>Уровень анизотропного фильтра</GS_AnisoLevel>
+	
+	<GS_TextureFiltering>Фильтрация текстур</GS_TextureFiltering>
+	<!--<GS_FilterModePoint>Point</GS_FilterModePoint>-->
+	<GS_FilterModeBilinear>Билинейная.</GS_FilterModeBilinear>
+	<GS_FilterModeTrilinear>Трилинейная.</GS_FilterModeTrilinear>
+	
+	<GS_Reset>Сброс</GS_Reset>
+	<GS_RestartRequired>Вам придется перезапустить игру, чтобы применить изменения!</GS_RestartRequired>
+	<GS_RestartGameButton>Перезапустить игру</GS_RestartGameButton>
+	
+	<GS_MipMapToolTip>Это значение изменяет степень размытости текстур в зависимости от масштаба, рекомендуется значение равное или ниже 0.</GS_MipMapToolTip>
+	<GS_AnisoLevelToolTip>Установите уровень анизотропной фильтрации, более высокие уровни могут снизить производительность на старых видеокартах.</GS_AnisoLevelToolTip>
+	
+	<!-- Memory -->
+	<GS_AllTextureMemory>Все текстуры содержимого</GS_AllTextureMemory>
+	<GS_ModsToProcessLabel>{0} моды для обработки...</GS_ModsToProcessLabel>
+	<GS_NoModsToProcess>Нет модов для обработки.</GS_NoModsToProcess>
+	
+	<GS_CachedAtlasses>Кэшированные текстуры Атласа</GS_CachedAtlasses>
+	
+	<GS_CacheRecalc>Пересчитать</GS_CacheRecalc>
+	<GS_CacheStop>Стоп</GS_CacheStop>
+	<GS_CacheContinue>Продолжить</GS_CacheContinue>
+	
+	<GS_CacheWarnRAM>Недостаточно видеопамяти</GS_CacheWarnRAM>
+	<GS_RecalcProcess>Вычисление... Пожалуйста, подождите.</GS_RecalcProcess>
+	<GS_CacheWarning>Предупреждение:\n{0}</GS_CacheWarning>
+	<GS_CacheWarnOverflow>Ваша система не поддерживает эти настройки."</GS_CacheWarnOverflow>
+	<GS_CacheWarnStruggle>Ваша система может испытывать проблемы с этими настройками.</GS_CacheWarnStruggle>
+</LanguageData>
