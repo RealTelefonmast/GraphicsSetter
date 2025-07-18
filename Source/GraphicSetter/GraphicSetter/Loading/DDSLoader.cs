@@ -1,193 +1,256 @@
-﻿using System.Collections.Generic;
-using System.IO;
-using System.Text;
+﻿using System.IO;
+using System.Runtime.InteropServices;
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
+using Verse;
 
 namespace GraphicSetter;
-
-//DDS importing from // https://github.com/sarbian/DDSLoader/blob/master/DatabaseLoaderTexture_DDS.cs
-public class DDSLoader
+public static class DDSLoader
 {
-    private const uint DDSD_MIPMAPCOUNT_BIT = 0x00020000;
-    private const uint DDPF_ALPHAPIXELS = 0x00000001;
-    private const uint DDPF_ALPHA = 0x00000002;
-    private const uint DDPF_FOURCC = 0x00000004;
-    private const uint DDPF_RGB = 0x00000040;
-    private const uint DDPF_YUV = 0x00000200;
-    private const uint DDPF_LUMINANCE = 0x00020000;
-    private const uint DDPF_NORMAL = 0x80000000;
+    public static string error; // return null, handle texture outside
+    public static string warning; // return dds loaded by unity, may be decompressed
 
-    public static string error;
-
-    // DDS Texture loader inspired by
-    // http://answers.unity3d.com/questions/555984/can-you-load-dds-textures-during-runtime.html#answer-707772
-    // http://msdn.microsoft.com/en-us/library/bb943992.aspx
-    // http://msdn.microsoft.com/en-us/library/windows/desktop/bb205578(v=vs.85).aspx
-    // mipmapBias limits the number of mipmap when > 0
-    public static Texture2D LoadDDS(string path)
+    private const uint
+        DDSD_MIPMAPCOUNT_BIT = 0x00020000,//Flag 
+        DDS_MAGIC = 0x20534444;
+    #region Header
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public struct DDS_HEADER
     {
-        if (!File.Exists(path))
+        public uint dwSize;
+        public uint dwFlags;
+        public int dwHeight;
+        public int dwWidth;
+        public uint dwPitchOrLinearSize;
+        public uint dwDepth;
+        public uint dwMipMapCount;
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 11)]
+        public uint[] dwReserved1;
+        public DDS_PIXELFORMAT ddspf;
+        public uint dwCaps;
+        public uint dwCaps2;
+        public uint dwCaps3;
+        public uint dwCaps4;
+        public uint dwReserved2;
+    }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public struct DDS_PIXELFORMAT
+    {
+        public uint dwSize;
+        public uint dwFlags;
+        public FourCC dwFourCC;
+        public uint dwRGBBitCount;
+        public uint dwRBitMask;
+        public uint dwGBitMask;
+        public uint dwBBitMask;
+        public uint dwABitMask;
+    }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public struct DDS_HEADER_DXT10
+    {
+        public DXGI_FORMAT dxgiFormat;
+        public uint resourceDimension;
+        public uint miscFlag;          // DDS_RESOURCE_MISC_FLAG
+        public uint arraySize;
+        public uint miscFlags2;        // DDS_MISC_FLAGS2
+    }
+    public enum DXGI_FORMAT : uint
+    {
+        DXGI_FORMAT_UNKNOWN = 0,
+        DXGI_FORMAT_R8G8B8A8_UNORM = 28,
+        DXGI_FORMAT_BC1_UNORM = 71,  // DXT1
+        DXGI_FORMAT_BC2_UNORM = 74,  // DXT3
+        DXGI_FORMAT_BC3_UNORM = 77,  // DXT5
+        DXGI_FORMAT_BC4_UNORM = 80,  // ATI1
+        DXGI_FORMAT_BC5_UNORM = 83,  // ATI2
+        DXGI_FORMAT_BC6H_UF16 = 95,
+        DXGI_FORMAT_BC7_UNORM = 98,
+        DXGI_FORMAT_BC7_UNORM_SRGB = 99
+        // etc...
+    }
+    public enum FourCC : uint
+    {
+        // Standard DXT Format
+        DXT1 = 0x31545844, // 'DXT1' - BC1
+        DXT2 = 0x32545844, // 'DXT2' - BC1 * Alpha
+        DXT3 = 0x33545844, // 'DXT3' - BC2 
+        DXT4 = 0x34545844, // 'DXT4' - BC3 * Alpha
+        DXT5 = 0x35545844, // 'DXT5' - BC3 
+        // DX10 Ext
+        DX10 = 0x30315844, // 'DX10' - Extended
+        
+        NONE = 0x00000000, // No Compression
+    }
+
+    #endregion
+
+    public static Texture2D LoadDDS(FileStream fileStream, out bool hasMipMaps)
+    {
+        error = null;
+        warning = null;
+        hasMipMaps = false;
+
+        using (BinaryReader reader = new BinaryReader(fileStream))
         {
-            error = "File does not exist";
-            return null;
-        }
-
-        using (var reader = new BinaryReader(File.Open(path, FileMode.Open, FileAccess.Read)))
-        {
-            var dwMagic = reader.ReadBytes(4);
-
-            if (!fourCCEquals(dwMagic, "DDS "))
+            Texture2D texture2D;
+            int dxtBytesLength = 0;
+            bool modifiedNon4 = false;
+            DeepProfiler.Start("Reading DDS Info");
+            try
             {
-                error = "Invalid DDS file";
-                return null;
-            }
-
-            var dwSize = (int)reader.ReadUInt32();
-
-            //this header byte should be 124 for DDS image files
-            if (dwSize != 124)
-            {
-                error = "Invalid header size";
-                return null;
-            }
-
-            var dwFlags = (int)reader.ReadUInt32();
-            var dwHeight = (int)reader.ReadUInt32();
-            var dwWidth = (int)reader.ReadUInt32();
-
-            var dwPitchOrLinearSize = (int)reader.ReadUInt32();
-            var dwDepth = (int)reader.ReadUInt32();
-            var dwMipMapCount = (int)reader.ReadUInt32();
-
-            if ((dwFlags & DDSD_MIPMAPCOUNT_BIT) == 0) dwMipMapCount = 1;
-
-            // dwReserved1
-            for (var i = 0; i < 11; i++) reader.ReadUInt32();
-
-            // DDS_PIXELFORMAT
-            var dds_pxlf_dwSize = reader.ReadUInt32();
-            var dds_pxlf_dwFlags = reader.ReadUInt32();
-            var dds_pxlf_dwFourCC = reader.ReadBytes(4);
-            var fourCC = Encoding.ASCII.GetString(dds_pxlf_dwFourCC);
-            var dds_pxlf_dwRGBBitCount = reader.ReadUInt32();
-            var pixelSize = dds_pxlf_dwRGBBitCount / 8;
-            var dds_pxlf_dwRBitMask = reader.ReadUInt32();
-            var dds_pxlf_dwGBitMask = reader.ReadUInt32();
-            var dds_pxlf_dwBBitMask = reader.ReadUInt32();
-            var dds_pxlf_dwABitMask = reader.ReadUInt32();
-
-            var dwCaps = (int)reader.ReadUInt32();
-            var dwCaps2 = (int)reader.ReadUInt32();
-            var dwCaps3 = (int)reader.ReadUInt32();
-            var dwCaps4 = (int)reader.ReadUInt32();
-            var dwReserved2 = (int)reader.ReadUInt32();
-
-            var textureFormat = TextureFormat.ARGB32;
-            var isCompressed = false;
-            var isNormalMap = (dds_pxlf_dwFlags & DDPF_NORMAL) != 0;
-
-            var alpha = (dds_pxlf_dwFlags & DDPF_ALPHA) != 0;
-            var fourcc = (dds_pxlf_dwFlags & DDPF_FOURCC) != 0;
-            var rgb = (dds_pxlf_dwFlags & DDPF_RGB) != 0;
-            var alphapixel = (dds_pxlf_dwFlags & DDPF_ALPHAPIXELS) != 0;
-            var luminance = (dds_pxlf_dwFlags & DDPF_LUMINANCE) != 0;
-            var rgb888 = dds_pxlf_dwRBitMask == 0x000000ff && dds_pxlf_dwGBitMask == 0x0000ff00 &&
-                         dds_pxlf_dwBBitMask == 0x00ff0000;
-            var bgr888 = dds_pxlf_dwRBitMask == 0x00ff0000 && dds_pxlf_dwGBitMask == 0x0000ff00 &&
-                         dds_pxlf_dwBBitMask == 0x000000ff;
-            var rgb565 = dds_pxlf_dwRBitMask == 0x0000F800 && dds_pxlf_dwGBitMask == 0x000007E0 &&
-                         dds_pxlf_dwBBitMask == 0x0000001F;
-            var argb4444 = dds_pxlf_dwABitMask == 0x0000f000 && dds_pxlf_dwRBitMask == 0x00000f00 &&
-                           dds_pxlf_dwGBitMask == 0x000000f0 && dds_pxlf_dwBBitMask == 0x0000000f;
-            var rbga4444 = dds_pxlf_dwABitMask == 0x0000000f && dds_pxlf_dwRBitMask == 0x0000f000 &&
-                           dds_pxlf_dwGBitMask == 0x000000f0 && dds_pxlf_dwBBitMask == 0x00000f00;
-            if (fourcc)
-            {
-                // Texture dos not contain RGB data, check FourCC for format
-                isCompressed = true;
-
-                if (fourCCEquals(dds_pxlf_dwFourCC, "DXT1"))
-                    textureFormat = TextureFormat.DXT1;
-                else if (fourCCEquals(dds_pxlf_dwFourCC, "DXT5"))
-                    textureFormat = TextureFormat.DXT5;
-                else if (fourCCEquals(dds_pxlf_dwFourCC, "DX10")) textureFormat = TextureFormat.BC7;
-            }
-            else if (rgb && (rgb888 || bgr888))
-            {
-                // RGB or RGBA format
-                textureFormat = alphapixel
-                    ? TextureFormat.RGBA32
-                    : TextureFormat.RGB24;
-            }
-            else if (rgb && rgb565)
-            {
-                // Nvidia texconv B5G6R5_UNORM
-                textureFormat = TextureFormat.RGB565;
-            }
-            else if (rgb && alphapixel && argb4444)
-            {
-                // Nvidia texconv B4G4R4A4_UNORM
-                textureFormat = TextureFormat.ARGB4444;
-            }
-            else if (rgb && alphapixel && rbga4444)
-            {
-                textureFormat = TextureFormat.RGBA4444;
-            }
-            else if (!rgb && alpha != luminance)
-            {
-                // A8 format or Luminance 8
-                textureFormat = TextureFormat.Alpha8;
-            }
-            else
-            {
-                error =
-                    "Only BC7, DXT1, DXT5, A8, RGB24, BGR24, RGBA32, BGBR32, RGB565, ARGB4444 and RGBA4444 are supported";
-                return null;
-            }
-
-            long dataBias;
-            if (textureFormat != TextureFormat.BC7)
-                dataBias = 128;
-            else
-                dataBias = 148;
-
-
-            var dxtBytesLength = reader.BaseStream.Length - dataBias;
-            reader.BaseStream.Seek(dataBias, SeekOrigin.Begin);
-            var dxtBytes = reader.ReadBytes((int)dxtBytesLength);
-
-            // Swap red and blue.
-            if (!isCompressed && bgr888)
-                for (uint i = 0; i < dxtBytes.Length; i += pixelSize)
+                uint magic = reader.ReadUInt32();
+                if (magic != DDS_MAGIC) // "DDS "
                 {
-                    var b = dxtBytes[i + 0];
-                    var r = dxtBytes[i + 2];
+                    error = "Invalid DDS file ";
+                    return null;
+                }
+                DDS_HEADER header = ReadStructure<DDS_HEADER>(reader);
 
-                    dxtBytes[i + 0] = r;
-                    dxtBytes[i + 2] = b;
+                if (header.dwSize != 124u)
+                {
+                    error = "Invalid header size";
+                    return null;
+                }
+                int width = header.dwWidth,
+                    height = header.dwHeight;
+
+
+                bool isDX10 = header.ddspf.dwFourCC == FourCC.DX10;
+                hasMipMaps = (header.dwFlags & DDSD_MIPMAPCOUNT_BIT) != 0 && header.dwMipMapCount > 1u;
+                DDS_HEADER_DXT10 headerdx10 = default;
+                GraphicsFormat graphicsFormat;
+                if (isDX10)
+                {
+                    headerdx10 = ReadStructure<DDS_HEADER_DXT10>(reader);
+                    graphicsFormat = headerdx10.dxgiFormat switch
+                    {
+                        DXGI_FORMAT.DXGI_FORMAT_BC1_UNORM => GraphicsFormat.RGBA_DXT1_UNorm,
+                        DXGI_FORMAT.DXGI_FORMAT_BC2_UNORM => GraphicsFormat.RGBA_DXT3_UNorm,
+                        DXGI_FORMAT.DXGI_FORMAT_BC3_UNORM => GraphicsFormat.RGBA_DXT5_UNorm,
+                        DXGI_FORMAT.DXGI_FORMAT_BC4_UNORM =>
+                            GraphicsFormatUtility.GetGraphicsFormat(TextureFormat.BC4, false),
+                        DXGI_FORMAT.DXGI_FORMAT_BC5_UNORM =>
+                            GraphicsFormatUtility.GetGraphicsFormat(TextureFormat.BC5, false),
+                        DXGI_FORMAT.DXGI_FORMAT_BC6H_UF16 => GraphicsFormat.RGB_BC6H_UFloat,
+                        DXGI_FORMAT.DXGI_FORMAT_BC7_UNORM => GraphicsFormat.RGBA_BC7_UNorm,
+                        DXGI_FORMAT.DXGI_FORMAT_BC7_UNORM_SRGB => GraphicsFormat.RGBA_BC7_SRGB,
+                        _ => GraphicsFormat.R8G8B8A8_SNorm
+
+                    };
+                }
+                else
+                {
+                    graphicsFormat = header.ddspf.dwFourCC switch
+                    {
+                        FourCC.DXT1 => GraphicsFormat.RGBA_DXT1_UNorm,
+                        FourCC.DXT3 => GraphicsFormat.RGBA_DXT3_UNorm,
+                        FourCC.DXT5 => GraphicsFormat.RGBA_DXT5_UNorm,
+                        _ => GraphicsFormat.R8G8B8A8_SNorm,
+                    };
                 }
 
-            //QualitySettings.masterTextureLimit = 0;
-            // Work around for an >Unity< Bug.
-            // if QualitySettings.masterTextureLimit != 0 (half or quarter texture rez)
-            // and dwWidth and dwHeight divided by 2 (or 4 for quarter rez) are not a multiple of 4 
-            // and we are creating a DXT5 or DXT1 texture
-            // Then you get an Unity error on the "new Texture"
+                if ((height & 3) != 0 || (width & 3) != 0)
+                {
+                    var _w = (width + 3) & ~3;
+                    var _h = (height + 3) & ~3;
+                    dxtBytesLength = _w * _h;
 
-            var quality = QualitySettings.masterTextureLimit;
+                    if (header.ddspf.dwFourCC == FourCC.DXT1)
+                        dxtBytesLength >>= 1;
+                    if (header.ddspf.dwFourCC != FourCC.NONE && dxtBytesLength <= reader.BaseStream.Length - reader.BaseStream.Position)
+                    {
+                        modifiedNon4 = true;
+                        height = _h;
+                        width = _w;
+                        if (header.dwMipMapCount > 1)
+                        {
+                            header.dwMipMapCount = 1;
+                        }
+                    }
+                    else
+                    {
+                        warning = "Not dividable by 4,try Fallback";
+                        goto FallBack;
+                    }
 
-            // If the bug conditions are present then switch to full quality
-            if (isCompressed && quality > 0 && (dwWidth >> quality) % 4 != 0 && (dwHeight >> quality) % 4 != 0)
-                QualitySettings.masterTextureLimit = 0;
+                }
 
-            var texture = new Texture2D(dwWidth, dwHeight, textureFormat, dwMipMapCount > 1);
-            texture.LoadRawTextureData(dxtBytes);
-            return texture;
+
+                if (graphicsFormat == GraphicsFormat.R8G8B8A8_SNorm)
+                {
+                    warning = $"Unknow Format {(!headerdx10.Equals(default) ? "dxgiFormat:" + headerdx10.dxgiFormat : "graphicFormat:" + graphicsFormat)}, try FallBack";
+                    goto FallBack;
+                }
+                texture2D = new Texture2D(width, height, graphicsFormat, (int)header.dwMipMapCount, TextureCreationFlags.None);
+                goto NormalRead;
+            }
+            finally
+            {
+
+                DeepProfiler.End();
+            }
+
+
+        NormalRead:
+
+
+            DeepProfiler.Start("Loading DDS Data To Ram");
+            try
+            {
+                if (!modifiedNon4)
+                {
+                    dxtBytesLength = (int)(reader.BaseStream.Length - reader.BaseStream.Position);
+                    uint MipChainSize = GraphicsFormatUtility.ComputeMipChainSize(texture2D.width, texture2D.height, texture2D.graphicsFormat, texture2D.mipmapCount);
+                    if (MipChainSize > dxtBytesLength)
+                    {
+                        warning = "Not Enough Data For Mipmap, try FallBack";
+                        goto FallBack;
+                    }
+                }
+
+                texture2D.LoadRawTextureData(reader.ReadBytes(dxtBytesLength));
+                fileStream.Close();
+                return texture2D;
+            }
+            finally
+            {
+                DeepProfiler.End();
+
+            }
+        FallBack:
+            DeepProfiler.Start("FallBack Load DDS");
+            try
+            {
+                var texture = new Texture2D(2, 2, TextureFormat.Alpha8, true);
+                fileStream.Seek(0, SeekOrigin.Begin);
+                texture.LoadImage(reader.ReadBytes((int)fileStream.Length));
+                fileStream.Close();
+                return texture;
+            }
+            finally
+            {
+                DeepProfiler.End();
+            }
         }
     }
 
-    private static bool fourCCEquals(IList<byte> bytes, string s)
+
+    private static T ReadStructure<T>(BinaryReader reader) where T : struct
     {
-        return bytes[0] == s[0] && bytes[1] == s[1] && bytes[2] == s[2] && bytes[3] == s[3];
+        int size = Marshal.SizeOf(typeof(T));
+        byte[] bytes = reader.ReadBytes(size);
+
+        GCHandle handle = GCHandle.Alloc(bytes, GCHandleType.Pinned);
+        try
+        {
+            return (T)Marshal.PtrToStructure(handle.AddrOfPinnedObject(), typeof(T));
+        }
+        finally
+        {
+            handle.Free();
+        }
     }
+
 }

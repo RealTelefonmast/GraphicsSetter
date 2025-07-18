@@ -12,8 +12,9 @@ public class DDSHelper
         var ddsPath = Path.ChangeExtension(file.FullPath, ".dds");
         if (!File.Exists(ddsPath))
             return null;
-
-        var texture = DDSLoader.LoadDDS(ddsPath);
+        using var fs = new FileInfo(ddsPath).Open(FileMode.Open);
+        
+        var texture = DDSLoader.LoadDDS(fs, out var _);
         if (!texture)
         {
             if (!DDSLoader.error.NullOrEmpty())
