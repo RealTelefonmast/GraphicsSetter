@@ -10,6 +10,7 @@ public class SettingsGroup : IExposable
     public bool overrideMipMapBias = false;
     public float mipMapBias = 0.0f;
     public bool verboseLogging = false;
+    public bool mainMenuButton = true;
     
     public static readonly FloatRange MipMapBiasRange = new FloatRange(-1f, 1f);
     
@@ -19,11 +20,12 @@ public class SettingsGroup : IExposable
         Scribe_Values.Look(ref overrideMipMapBias, "overrideMipMapBias", false);
         Scribe_Values.Look(ref mipMapBias, "mipMapBias", 0.0f);
         Scribe_Values.Look(ref verboseLogging, "verboseLogging", false);
+        Scribe_Values.Look(ref mainMenuButton, "mainMenuButton", true);
     }
     
     public bool IsDefault()
     {
-        return enableDDSLoading && !overrideMipMapBias && mipMapBias == 0.0f && !verboseLogging;
+        return enableDDSLoading && !overrideMipMapBias && mipMapBias == 0.0f && !verboseLogging && mainMenuButton;
     }
     
     public void Reset()
@@ -32,6 +34,7 @@ public class SettingsGroup : IExposable
         overrideMipMapBias = false;
         mipMapBias = 0.0f;
         verboseLogging = false;
+        mainMenuButton = true;
     }
 }
 
@@ -110,7 +113,10 @@ public class GraphicsSettings : ModSettings
         Text.Font = GameFont.Small;
         GUI.color = Color.white;
         
-        //listing.Gap(25);
+        listing.Gap(25);
+        enableRect = listing.GetRect(26f);
+        Widgets.CheckboxLabeled(enableRect, "Display main menu button", ref mainSettings.mainMenuButton);
+        TooltipHandler.TipRegion(enableRect, "Changes to this require a restart to apply");
         
         // Advanced section with visual separator
         //DrawSectionHeader(listing, "Advanced Options", "⚙");
