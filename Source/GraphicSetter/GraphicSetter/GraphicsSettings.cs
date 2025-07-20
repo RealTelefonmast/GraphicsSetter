@@ -6,9 +6,11 @@ namespace GraphicSetter;
 
 public class SettingsGroup : IExposable
 {
+    public const float DefaultMipMapBias = -0.7f;
+    
     public bool enableDDSLoading = true;
     public bool overrideMipMapBias = false;
-    public float mipMapBias = 0.0f;
+    public float mipMapBias = DefaultMipMapBias;
     public bool verboseLogging = false;
     public bool mainMenuButton = true;
     
@@ -18,21 +20,23 @@ public class SettingsGroup : IExposable
     {
         Scribe_Values.Look(ref enableDDSLoading, "enableDDSLoading", true);
         Scribe_Values.Look(ref overrideMipMapBias, "overrideMipMapBias", false);
-        Scribe_Values.Look(ref mipMapBias, "mipMapBias", 0.0f);
+        Scribe_Values.Look(ref mipMapBias, "mipMapBias", DefaultMipMapBias);
         Scribe_Values.Look(ref verboseLogging, "verboseLogging", false);
         Scribe_Values.Look(ref mainMenuButton, "mainMenuButton", true);
     }
-    
+
     public bool IsDefault()
-    {
-        return enableDDSLoading && !overrideMipMapBias && mipMapBias == 0.0f && !verboseLogging && mainMenuButton;
-    }
-    
+        => enableDDSLoading
+            && !overrideMipMapBias
+            && Mathf.Approximately(mipMapBias, DefaultMipMapBias)
+            && !verboseLogging
+            && mainMenuButton;
+
     public void Reset()
     {
         enableDDSLoading = true;
         overrideMipMapBias = false;
-        mipMapBias = 0.0f;
+        mipMapBias = DefaultMipMapBias;
         verboseLogging = false;
         mainMenuButton = true;
     }
