@@ -96,11 +96,11 @@ public static class DDSLoader
         var dds_pxlf_dwBBitMask = ReadUInt32(span, ref index);
         var dds_pxlf_dwABitMask = ReadUInt32(span, ref index);
 
-        var dwCaps = ReadUInt32(span, ref index);
-        var dwCaps2 = ReadUInt32(span, ref index);
-        var dwCaps3 = ReadUInt32(span, ref index);
-        var dwCaps4 = ReadUInt32(span, ref index);
-        var dwReserved2 = ReadUInt32(span, ref index);
+        // var dwCaps = ReadUInt32(span, ref index);
+        // var dwCaps2 = ReadUInt32(span, ref index);
+        // var dwCaps3 = ReadUInt32(span, ref index);
+        // var dwCaps4 = ReadUInt32(span, ref index);
+        // var dwReserved2 = ReadUInt32(span, ref index);
 
         TextureFormat textureFormat;
         var isCompressed = false;
@@ -165,22 +165,21 @@ public static class DDSLoader
         if (textureFormat == default)
         {
             error
-                = "Only BC7, DXT1, DXT5, A8, RGB24, BGR24, RGBA32, BGBR32, RGB565, ARGB4444 and RGBA4444 are supported";
+                = "Only BC7, DXT1, DXT5, A8, RGB24, BGR24, RGBA32, BGRA32, RGB565, ARGB4444 and RGBA4444 are supported";
             
             return null;
         }
 
         var dataBias = textureFormat != TextureFormat.BC7 ? 128 : 148;
         
-        var dxtBytesLength = span.Length - dataBias;
-        
-        index = dataBias;
-        var dxtBytes = ReadBytes(span, dxtBytesLength, ref index);
+        var dxtBytes = span[dataBias..];
 
         // Swap red and blue.
         if (!isCompressed && bgr888)
         {
-            for (var i = 0; i < dxtBytes.Length; i += (int)pixelSize)
+            dxtBytes = dxtBytes.ToArray(); // dxtBytes otherwise pointing at readonly storage
+
+            for (var i = 0; i + 2 < dxtBytes.Length; i += (int)pixelSize)
             {
                 var b = dxtBytes[i + 0];
                 var r = dxtBytes[i + 2];
@@ -207,7 +206,7 @@ public static class DDSLoader
         unsafe
         {
             fixed (byte* pData = &dxtBytes[0])
-                texture.LoadRawTextureData((IntPtr)pData, dxtBytesLength);
+                texture.LoadRawTextureData((IntPtr)pData, dxtBytes.Length);
         }
 
         QualitySettings.globalTextureMipmapLimit = quality;
