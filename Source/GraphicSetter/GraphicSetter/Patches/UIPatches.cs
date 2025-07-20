@@ -3,6 +3,7 @@ using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using HarmonyLib;
+using JetBrains.Annotations;
 using RimWorld;
 using UnityEngine;
 using Verse;
@@ -34,13 +35,19 @@ internal class UIPatches
             OptionList = optList;
         }
 
-        static bool Prefix(ref Rect rect, bool anyMapFiles)
+        [UsedImplicitly]
+        [HarmonyPrepare]
+        public static bool Prepare() => GraphicsSettings.mainSettings.mainMenuButton;
+
+        [UsedImplicitly]
+        public static bool Prefix(ref Rect rect, bool anyMapFiles)
         {
             rect = new Rect(rect.x, rect.y, rect.width, rect.height + addedHeight);
             return true;
         }
 
-        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+        [UsedImplicitly]
+        public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
         {
             var m_DrawOptionListing =
                 SymbolExtensions.GetMethodInfo(() => OptionListingUtility.DrawOptionListing(Rect.zero, null));

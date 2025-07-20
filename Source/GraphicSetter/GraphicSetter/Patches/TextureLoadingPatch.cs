@@ -1,5 +1,7 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using HarmonyLib;
+using JetBrains.Annotations;
 using RimWorld.IO;
 using UnityEngine;
 using Verse;
@@ -11,72 +13,86 @@ internal static class TextureLoadingPatch
     [HarmonyPatch(typeof(ModContentLoader<Texture2D>), "LoadTexture", MethodType.Normal)]
     public static class LoadTexture_Patch
     {
-        private static bool Prefix(VirtualFile file, ref Texture2D __result)
+        [UsedImplicitly]
+        public static bool Prefix(VirtualFile file, ref Texture2D __result)
         {
             __result = CustomLoad(file);
             return false;
         }
 
-        private static Texture2D CustomLoad(VirtualFile file)
+        public static Texture2D CustomLoad(VirtualFile file, bool readable = false)
         {
-            if (!file.Exists)
-                return null;
-
-            var texture2D = DDSHelper.TryLoadDDS(file);
-            var ddsLoaded = texture2D != null;
-            byte[] array = null;
-            if (!ddsLoaded)
+            Texture2D texture2D = null;
+            var settings = GraphicsSettings.mainSettings;
+            try
             {
-                array = file.ReadAllBytes();
-                texture2D = new Texture2D(2, 2, TextureFormat.Alpha8, true);
-                texture2D.LoadImage(array);
-            }
+                var hasMipMapsSet = false;
+                var loadedFromDds = DDSHelper.TryLoadDDS(file, ref hasMipMapsSet, ref texture2D);
 
-            if ((texture2D.width < 4 || texture2D.height < 4 || !Mathf.IsPowerOfTwo(texture2D.width) ||
-                 !Mathf.IsPowerOfTwo(texture2D.height)) && Prefs.TextureCompression)
-            {
-                var num = StaticTextureAtlas.CalculateMaxMipmapsForDxtSupport(texture2D);
-                if (Prefs.LogVerbose)
-                    Log.Warning(string.Format(
-                        "Texture {0} is being reloaded with reduced mipmap count (clamped to {1}) due to non-power-of-two dimensions: ({2}x{3}). This will be slower to load, and will look worse when zoomed out. Consider using a power-of-two texture size instead.",
-                        file.Name, num, texture2D.width, texture2D.height));
-                if (!UnityData.ComputeShadersSupported)
+                if (!texture2D && file.Exists)
                 {
-                    var texture2D2 = new Texture2D(texture2D.width, texture2D.height, TextureFormat.Alpha8, num, false);
-                    Object.DestroyImmediate(texture2D);
-                    texture2D = texture2D2;
-                    array ??= file.ReadAllBytes();
-                    texture2D.LoadImage(array);
+                    var data = file.ReadAllBytes();
+                    texture2D = new(2, 2, TextureFormat.Alpha8, true /*settings.useMipMap*/);
+                    texture2D.LoadImage(data);
+                    hasMipMapsSet = FixMipMapsIfNeeded(ref texture2D, data, file);
                 }
-            }
 
-            var flag = texture2D.width % 4 == 0 && texture2D.height % 4 == 0;
-            if (Prefs.TextureCompression && flag)
-            {
-                if (!UnityData.ComputeShadersSupported)
-                {
+                if (!texture2D)
+                    throw new($"Could not load texture at '{file.FullPath}'.");
+
+                if (!loadedFromDds && Prefs.TextureCompression)
                     texture2D.Compress(true);
-                    texture2D.filterMode = FilterMode.Trilinear;
-                    texture2D.anisoLevel = 2;
-                    texture2D.Apply(true, true);
-                }
-                else
-                {
-                    texture2D.filterMode = FilterMode.Trilinear;
-                    texture2D.anisoLevel = 2;
-                    texture2D.Apply(true, true);
-                    texture2D = StaticTextureAtlas.FastCompressDXT(texture2D, true);
-                }
-            }
-            else
-            {
+
+                texture2D.name = Path.GetFileNameWithoutExtension(file.Name);
                 texture2D.filterMode = FilterMode.Trilinear;
-                texture2D.anisoLevel = 2;
-                texture2D.Apply(true, true);
+                
+                texture2D.anisoLevel = 1;
+                // 2 or higher is impossible to display with rimworld's orthographic camera.
+                // Planets are loaded from asset bundles
+                
+                texture2D.mipMapBias = settings.mipMapBias;
+                texture2D.Apply(!hasMipMapsSet, !readable);
+            }
+            catch (Exception exception)
+            {
+                Log.Error($"[Graphics Settings][{(file?.Name ?? "Missing File...")}] {exception}");
             }
 
-            texture2D.name = Path.GetFileNameWithoutExtension(file.Name);
             return texture2D;
         }
     }
+
+    private static bool FixMipMapsIfNeeded(ref Texture2D texture2D, byte[] data, VirtualFile file)
+    {
+        if (!CheckMipMapFix(texture2D, file))
+            return false;
+
+        UnityEngine.Object.DestroyImmediate(texture2D);
+
+        texture2D = new(2, 2, TextureFormat.Alpha8, false);
+        texture2D.LoadImage(data);
+        return true;
+    }
+
+    public static bool CheckMipMapFix(Texture2D texture2D, VirtualFile file)
+    {
+        var needsFix = NeedsMipMapFix(texture2D);
+        if (needsFix)
+            LogMipMapWarning(texture2D, file);
+
+        return needsFix;
+    }
+
+    private static void LogMipMapWarning(Texture2D texture2D, VirtualFile file)
+    {
+        if (!Prefs.LogVerbose)
+            return;
+
+        Log.Warning($"Texture does not support mipmapping, needs to be divisible by 4 ({
+            texture2D.width}x{texture2D.height}) for '{file.Name}'");
+    }
+
+    private static bool NeedsMipMapFix(Texture2D texture2D)
+        => /*GraphicsSettings.mainSettings.useMipMap
+            &&*/ (((texture2D.width & 3) != 0) | ((texture2D.height & 3) != 0));
 }

@@ -7,7 +7,7 @@
 		<TargetFramework>net472</TargetFramework>
 		<LangVersion>latest</LangVersion>
 		<PlatformTarget>x64</PlatformTarget>
-		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+		<OutDir>..\..\..\1.6\Assemblies\</OutDir>
 
 		<!-- Version Settings -->
 		<Version>1.0.0</Version>
@@ -17,57 +17,26 @@
 
 		<!-- Build Settings -->
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-		<DefineConstants>TRACE;DEBUG</DefineConstants>
 		<WarningLevel>4</WarningLevel>
+		
+		<Optimize>true</Optimize>
+		<DebugType>portable</DebugType>
 	</PropertyGroup>
 
 	<!-- Configuration-specific settings -->
 	<PropertyGroup Condition="'$(Configuration)' == 'Debug'">
-		<OutputPath>..\..\..\1.6\Assemblies\</OutputPath>
-		<Optimize>false</Optimize>
-		<DebugType>full</DebugType>
+		<DefineConstants>TRACE;DEBUG</DefineConstants>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)' == 'Release'">
-		<OutputPath>..\..\..\1.6\Assemblies\</OutputPath>
-		<Optimize>true</Optimize>
-		<DebugType>none</DebugType>
 	</PropertyGroup>
 
 	<!-- Package References -->
 	<ItemGroup>
-		<PackageReference Include="Krafs.Rimworld.Ref" Version="1.6.4523" GeneratePathProperty="true" />
-		<PackageReference Include="Lib.Harmony" Version="2.2.2" ExcludeAssets="runtime" />
-		<PackageReference Include="TaskPubliciser" Version="1.0.3" />
+		<PackageReference Include="Krafs.Rimworld.Ref" Version="1.6.*" GeneratePathProperty="true" />
+		<PackageReference Include="Lib.Harmony" Version="2.3.6" ExcludeAssets="runtime" />
+		<PackageReference Include="Krafs.Publicizer" Version="2.*" />
+		<Publicize Include="Assembly-CSharp" IncludeVirtualMembers="false" IncludeCompilerGeneratedMembers="false" />
 	</ItemGroup>
-
-	<!-- RimWorld Assembly Publicisation -->
-	<Target Name="PubliciseRimworldAssemblies" BeforeTargets="UpdateReferences">
-		<PropertyGroup>
-			<AssemblyCSharp>$(PkgKrafs_Rimworld_Ref)\ref\net472\Assembly-CSharp.dll</AssemblyCSharp>
-			<PubliciseOutputPath>$(PkgKrafs_Rimworld_Ref)\ref\net472\</PubliciseOutputPath>
-			<AssemblyCSharp_Publicised>$(PubliciseOutputPath)Assembly-CSharp_publicised.dll</AssemblyCSharp_Publicised>
-		</PropertyGroup>
-
-		<Message Importance="High" Text="Publicising RimWorld Assembly..." />
-		<Publicise TargetAssemblyPath="$(AssemblyCSharp)" OutputPath="$(PubliciseOutputPath)" Condition="Exists('$(AssemblyCSharp)')" />
-
-		<Message Importance="High" Text="Adding reference to publicised assembly..." />
-		<ItemGroup>
-			<Reference Include="$(AssemblyCSharp_Publicised)">
-				<SpecificVersion>false</SpecificVersion>
-				<HintPath>$(AssemblyCSharp_Publicised)</HintPath>
-				<Implicit>true</Implicit>
-				<Private>false</Private>
-			</Reference>
-		</ItemGroup>
-	</Target>
-
-	<Target Name="UpdateReferences" AfterTargets="ResolveLockFileReferences">
-		<Message Importance="High" Text="Removing original Assembly-CSharp reference..." />
-		<ItemGroup>
-			<Reference Remove="$(PkgKrafs_Rimworld_Ref)\ref\net472\Assembly-CSharp.dll" />
-		</ItemGroup>
-	</Target>
 
 </Project>
