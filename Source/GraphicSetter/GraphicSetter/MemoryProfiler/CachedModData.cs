@@ -16,15 +16,25 @@ internal class CachedModData(ModContentPack mod)
 
     public void RegisterTexture(Texture2D texture)
     {
-        var textureSize = new Vector2(texture.width, texture.height);
+        if (!texture)
+            return;
+        
+        try
+        {
+            var textureSize = new Vector2(texture.width, texture.height);
 
-        TotalTextureCount++;
-        MemoryUsage += EstimateTextureMemorySize(texture);
+            TotalTextureCount++;
+            MemoryUsage += EstimateTextureMemorySize(texture);
 
-        if (textureSize.x >= 512 || textureSize.y >= 512)
-            TexturesWithoutAtlasCount++;
-        else
-            TexturesInAtlasCount++;
+            if (textureSize.x >= 512 || textureSize.y >= 512)
+                TexturesWithoutAtlasCount++;
+            else
+                TexturesInAtlasCount++;
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"Exception registering texture for memory calculation:{ex}");
+        }
     }
 
     private static long EstimateTextureMemorySize(Texture2D texture)
