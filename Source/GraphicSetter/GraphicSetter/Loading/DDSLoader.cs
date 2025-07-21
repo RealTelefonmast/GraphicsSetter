@@ -96,11 +96,11 @@ public static class DDSLoader
         var dds_pxlf_dwBBitMask = ReadUInt32(span, ref index);
         var dds_pxlf_dwABitMask = ReadUInt32(span, ref index);
 
-        var dwCaps = ReadUInt32(span, ref index);
-        var dwCaps2 = ReadUInt32(span, ref index);
-        var dwCaps3 = ReadUInt32(span, ref index);
-        var dwCaps4 = ReadUInt32(span, ref index);
-        var dwReserved2 = ReadUInt32(span, ref index);
+        // var dwCaps = ReadUInt32(span, ref index);
+        // var dwCaps2 = ReadUInt32(span, ref index);
+        // var dwCaps3 = ReadUInt32(span, ref index);
+        // var dwCaps4 = ReadUInt32(span, ref index);
+        // var dwReserved2 = ReadUInt32(span, ref index);
 
         TextureFormat textureFormat;
         var isCompressed = false;
@@ -165,22 +165,21 @@ public static class DDSLoader
         if (textureFormat == default)
         {
             error
-                = "Only BC7, DXT1, DXT5, A8, RGB24, BGR24, RGBA32, BGBR32, RGB565, ARGB4444 and RGBA4444 are supported";
+                = "Only BC7, DXT1, DXT5, A8, RGB24, BGR24, RGBA32, BGRA32, RGB565, ARGB4444 and RGBA4444 are supported";
             
             return null;
         }
 
         var dataBias = textureFormat != TextureFormat.BC7 ? 128 : 148;
         
-        var dxtBytesLength = span.Length - dataBias;
-        
-        index = dataBias;
-        var dxtBytes = ReadBytes(span, dxtBytesLength, ref index);
+        var dxtBytes = span[dataBias..];
 
         // Swap red and blue.
         if (!isCompressed && bgr888)
         {
-            for (var i = 0; i < dxtBytes.Length; i += (int)pixelSize)
+            dxtBytes = dxtBytes.ToArray(); // dxtBytes otherwise pointing at readonly storage
+
+            for (var i = 0; i + 2 < dxtBytes.Length; i += (int)pixelSize)
             {
                 var b = dxtBytes[i + 0];
                 var r = dxtBytes[i + 2];
@@ -190,28 +189,51 @@ public static class DDSLoader
             }
         }
 
-        // Work around for a >Unity< Bug.
-        // if QualitySettings.masterTextureLimit != 0 (half or quarter texture rez)
-        // and dwWidth and dwHeight divided by 2 (or 4 for quarter rez) are not a multiple of 4, 
-        // and we are creating a DXT5 or DXT1 texture
-        // Then you get a Unity error on the "new Texture"
+        // no longer works as of unity 2022.3.35. The bug is still there tho
+        // // Work around for a >Unity< Bug.
+        // // if QualitySettings.masterTextureLimit != 0 (half or quarter texture rez)
+        // // and dwWidth and dwHeight divided by 2 (or 4 for quarter rez) are not a multiple of 4, 
+        // // and we are creating a DXT5 or DXT1 texture
+        // // Then you get a Unity error on the "new Texture"
+        //
+        // var quality = QualitySettings.globalTextureMipmapLimit;
+        //
+        // // If the bug conditions are present then switch to full quality
+        // if (isCompressed && quality > 0 && ((dwWidth & 3) != 0 || (dwHeight & 3) != 0))
+        //     QualitySettings.globalTextureMipmapLimit = 0;
 
-        var quality = QualitySettings.globalTextureMipmapLimit;
-
-        // If the bug conditions are present then switch to full quality
-        if (isCompressed && quality > 0 && ((dwWidth >> quality) & 3) != 0 && ((dwHeight >> quality) & 3) != 0)
-            QualitySettings.globalTextureMipmapLimit = 0;
-
-        var texture = new Texture2D((int)dwWidth, (int)dwHeight, textureFormat, hasMipMaps = (int)dwMipMapCount > 1);
-
-        unsafe
+        if (isCompressed && ((dwWidth & 3) != 0 || (dwHeight & 3) != 0))
         {
-            fixed (byte* pData = &dxtBytes[0])
-                texture.LoadRawTextureData((IntPtr)pData, dxtBytesLength);
+            error = $"Cannot load compressed texture with non multiple of 4 dimensions of {dwWidth}x{
+                dwHeight} and format {textureFormat}";
+            
+            return null;
         }
 
-        QualitySettings.globalTextureMipmapLimit = quality;
-        return texture;
+        try
+        {
+            var texture = new Texture2D((int)dwWidth, (int)dwHeight, textureFormat,
+                hasMipMaps = (int)dwMipMapCount > 1);
+
+            unsafe
+            {
+                fixed (byte* pData = &dxtBytes[0])
+                    texture.LoadRawTextureData((IntPtr)pData, dxtBytes.Length);
+            }
+
+            return texture;
+        }
+        catch (Exception exception)
+        {
+            error = $"Exception loading texture with format '{textureFormat}', width '{
+                dwWidth}', height '{dwHeight}', mipCount '{dwMipMapCount}':\n{exception}";
+        }
+        // finally
+        // {
+        //     QualitySettings.globalTextureMipmapLimit = quality;
+        // }
+        
+        return null;
     }
 
     private static bool FourCcEquals(Span<char> bytes, string s) => bytes.SequenceEqual(s);

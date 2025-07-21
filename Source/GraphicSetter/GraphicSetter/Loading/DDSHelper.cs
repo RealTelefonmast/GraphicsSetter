@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using GraphicSetter.Patches;
 using RimWorld.IO;
 using UnityEngine;
@@ -16,14 +17,33 @@ public class DDSHelper
             return false;
         
         var loadedFromDds = false;
-        texture2D = DDSLoader.LoadDDS(ddsExtensionPath, out hasMipMapsSet, true);
+        var logWarning = default(string);
+        
+        try
+        {
+            texture2D = DDSLoader.LoadDDS(ddsExtensionPath, out hasMipMapsSet, true);
+        }
+        catch (Exception exception)
+        {
+            logWarning = $"Caught exception while loading '{ddsExtensionPath}': {exception}";
+        }
 
         if (!DDSLoader.error.NullOrEmpty())
-            Log.Warning($"DDS loading failed for '{file.FullPath}': {DDSLoader.error}");
+        {
+            var errorText = $"DDS loading failed for '{ddsExtensionPath}': {DDSLoader.error}";
+            if (logWarning.NullOrEmpty())
+                logWarning = errorText;
+            else
+                Log.Warning($"DDS loading failed for '{ddsExtensionPath}': {DDSLoader.error}");
+            
+            DDSLoader.error = null;
+        }
 
         if (!texture2D)
         {
-            Log.Warning($"Couldn't load .dds from '{file.Name}'. Loading as png instead.");
+            Log.Warning(logWarning.NullOrEmpty()
+                ? $"Couldn't load .dds from '{ddsExtensionPath}'. Loading from png instead."
+                : $"{logWarning}\nLoading from png instead.");
         }
         else
         {
