@@ -124,9 +124,9 @@ public class GraphicsSettings : ModSettings
         
         // Advanced section with visual separator
         //DrawSectionHeader(listing, "Advanced Options", "⚙");
-        //listing.Gap(8);
+        listing.Gap(8);
         
-        /*// Mipmap bias section
+        // Mipmap bias section
         var biasRect = listing.GetRect(24);
         Widgets.CheckboxLabeled(biasRect, "Override Mipmap Bias", ref mainSettings.overrideMipMapBias);
         
@@ -163,7 +163,7 @@ public class GraphicsSettings : ModSettings
             Widgets.Label(indicatorRect, GetMipmapDescription(mainSettings.mipMapBias));
             Text.Anchor = TextAnchor.UpperLeft;
             GUI.color = Color.white;
-        }*/
+        }
         
         // Bottom section with stats
         listing.Gap(30);
