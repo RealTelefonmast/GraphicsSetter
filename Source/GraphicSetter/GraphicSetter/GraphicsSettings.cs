@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using Unity.Mathematics;
 using UnityEngine;
 using Verse;
 
@@ -144,9 +146,11 @@ public class GraphicsSettings : ModSettings
             
             // Draw the slider
             var sliderInner = sliderBg.ContractedBy(3);
-            mainSettings.mipMapBias = Widgets.HorizontalSlider(
+            // Invert the bias for better UX
+            var uiBias = InvertBias(mainSettings.mipMapBias);
+            uiBias = Widgets.HorizontalSlider(
                 sliderInner,
-                mainSettings.mipMapBias,
+                uiBias,
                 SettingsGroup.MipMapBiasRange.min,
                 SettingsGroup.MipMapBiasRange.max,
                 true,
@@ -154,6 +158,7 @@ public class GraphicsSettings : ModSettings
                 "Blurry",
                 "Sharp",
                 0.01f);
+            mainSettings.mipMapBias = InvertBias(uiBias);
             
             // Visual indicator below
             listing.Gap(4);
@@ -183,6 +188,11 @@ public class GraphicsSettings : ModSettings
         }
         
         listing.End();
+    }
+
+    private float InvertBias(float bias)
+    {
+        return -1 * bias;
     }
     
     private void DrawSectionHeader(Listing_Standard listing, string text, string icon = null)
@@ -263,11 +273,14 @@ public class GraphicsSettings : ModSettings
     
     private string GetMipmapDescription(float bias)
     {
-        if (bias < -0.5f) return "Performance mode";
-        if (bias < 0f) return "Balanced-Performance";
-        if (bias == 0f) return "Balanced (Default)";
-        if (bias < 0.5f) return "Balanced-Quality";
-        return "Quality mode";
+        return bias switch
+        {
+            >= 0.5f => "Performance mode",
+            > 0f => "Balanced-Performance",
+            0f => "Balanced (Default)",
+            >= -0.5f => "Balanced-Quality",
+            _ => "Quality mode"
+        };
     }
     
     public void DrawMemory(Rect rect)
